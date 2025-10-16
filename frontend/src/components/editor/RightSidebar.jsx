@@ -39,7 +39,11 @@ const RightSidebar = () => {
         fontSize: activeObject.fontSize || 32,
         fontFamily: activeObject.fontFamily || 'Inter',
         fontWeight: activeObject.fontWeight || 'normal',
-        textAlign: activeObject.textAlign || 'left'
+        textAlign: activeObject.textAlign || 'left',
+        brightness: activeObject.brightness || 0,
+        contrast: activeObject.contrast || 0,
+        saturation: activeObject.saturation || 0,
+        blur: activeObject.blur || 0
       });
     }
   }, [activeObject]);
