@@ -86,7 +86,7 @@ const LeftSidebar = () => {
       let shape;
       switch (shapeType) {
         case 'rectangle':
-          shape = new fabric.Rect({
+          shape = new Rect({
             left: 100,
             top: 100,
             width: 200,
@@ -95,7 +95,7 @@ const LeftSidebar = () => {
           });
           break;
         case 'circle':
-          shape = new fabric.Circle({
+          shape = new Circle({
             left: 100,
             top: 100,
             radius: 75,
@@ -103,7 +103,7 @@ const LeftSidebar = () => {
           });
           break;
         case 'triangle':
-          shape = new fabric.Triangle({
+          shape = new Triangle({
             left: 100,
             top: 100,
             width: 150,
@@ -112,7 +112,7 @@ const LeftSidebar = () => {
           });
           break;
         case 'line':
-          shape = new fabric.Line([50, 100, 200, 100], {
+          shape = new Line([50, 100, 200, 100], {
             left: 100,
             top: 100,
             stroke: '#1e293b',
@@ -134,7 +134,7 @@ const LeftSidebar = () => {
     if (file && canvas) {
       const reader = new FileReader();
       reader.onload = (event) => {
-        fabric.Image.fromURL(event.target.result, (img) => {
+        FabricImage.fromURL(event.target.result, { crossOrigin: 'anonymous' }).then((img) => {
           img.scaleToWidth(300);
           img.set({ left: 100, top: 100 });
           canvas.add(img);
