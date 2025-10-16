@@ -7,9 +7,10 @@ import { Input } from '../ui/input';
 import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff } from 'lucide-react';
+import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, Wand2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from '../ui/sonner';
+import { filters } from 'fabric';
 
 const RightSidebar = () => {
   const { canvas, activeObject, layers, saveToHistory, updateLayers } = useEditor();
