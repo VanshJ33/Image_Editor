@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { fabric } from 'fabric';
+import { Canvas as FabricCanvas } from 'fabric';
 import { useEditor } from '../../contexts/EditorContext';
 import { motion } from 'framer-motion';
 
@@ -9,7 +9,7 @@ const Canvas = () => {
 
   useEffect(() => {
     if (canvasRef.current && !canvas) {
-      const fabricCanvas = new fabric.Canvas(canvasRef.current, {
+      const fabricCanvas = new FabricCanvas(canvasRef.current, {
         width: canvasSize.width,
         height: canvasSize.height,
         backgroundColor: '#ffffff',
