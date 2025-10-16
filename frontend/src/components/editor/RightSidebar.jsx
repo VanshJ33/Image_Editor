@@ -22,7 +22,11 @@ const RightSidebar = () => {
     fontSize: 32,
     fontFamily: 'Inter',
     fontWeight: 'normal',
-    textAlign: 'left'
+    textAlign: 'left',
+    brightness: 0,
+    contrast: 0,
+    saturation: 0,
+    blur: 0
   });
 
   useEffect(() => {
