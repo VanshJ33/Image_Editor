@@ -65,7 +65,7 @@ const LeftSidebar = () => {
 
   const addSubheading = () => {
     if (canvas) {
-      const text = new fabric.Textbox('Subheading Text', {
+      const text = new Textbox('Subheading Text', {
         left: 100,
         top: 100,
         width: 400,
