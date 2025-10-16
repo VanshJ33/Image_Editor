@@ -47,7 +47,7 @@ const LeftSidebar = () => {
 
   const addHeading = () => {
     if (canvas) {
-      const text = new fabric.Textbox('Heading Text', {
+      const text = new Textbox('Heading Text', {
         left: 100,
         top: 100,
         width: 500,
