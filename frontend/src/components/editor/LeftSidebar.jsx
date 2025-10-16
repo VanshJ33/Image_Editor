@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { LayoutTemplate, Upload, Type, Shapes, Image as ImageIcon, Sparkles } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useEditor } from '../../contexts/EditorContext';
-import { fabric } from 'fabric';
+import { Textbox, Rect, Circle, Triangle, Line, FabricImage } from 'fabric';
 import { templates } from '../../data/templates';
 import { toast } from '../ui/sonner';
 
@@ -30,7 +30,7 @@ const LeftSidebar = () => {
 
   const addText = () => {
     if (canvas) {
-      const text = new fabric.Textbox('Add your text here', {
+      const text = new Textbox('Add your text here', {
         left: 100,
         top: 100,
         width: 300,
