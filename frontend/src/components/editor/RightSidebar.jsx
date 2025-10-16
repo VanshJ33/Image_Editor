@@ -52,12 +52,41 @@ const RightSidebar = () => {
     if (activeObject && canvas) {
       if (key === 'opacity') {
         activeObject.set(key, value / 100);
+      } else if (['brightness', 'contrast', 'saturation', 'blur'].includes(key)) {
+        activeObject.set(key, value);
+        applyFilters();
       } else {
         activeObject.set(key, value);
       }
       canvas.renderAll();
       setProperties(prev => ({ ...prev, [key]: value }));
       saveToHistory();
+    }
+  };
+
+  const applyFilters = () => {
+    if (activeObject && activeObject.type === 'image') {
+      const filterArray = [];
+      
+      if (properties.brightness !== 0) {
+        filterArray.push(new filters.Brightness({ brightness: properties.brightness / 100 }));
+      }
+      
+      if (properties.contrast !== 0) {
+        filterArray.push(new filters.Contrast({ contrast: properties.contrast / 100 }));
+      }
+      
+      if (properties.saturation !== 0) {
+        filterArray.push(new filters.Saturation({ saturation: properties.saturation / 100 }));
+      }
+      
+      if (properties.blur > 0) {
+        filterArray.push(new filters.Blur({ blur: properties.blur / 100 }));
+      }
+      
+      activeObject.filters = filterArray;
+      activeObject.applyFilters();
+      canvas.renderAll();
     }
   };
 
