@@ -362,6 +362,97 @@ const RightSidebar = () => {
                     />
                   </div>
                 </div>
+
+                {activeObject.type === 'image' && (
+                  <>
+                    <div className="space-y-4">
+                      <div className="flex items-center gap-2 mb-3">
+                        <Wand2 className="w-4 h-4" />
+                        <Label className="font-semibold">Image Filters</Label>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Brightness</Label>
+                        <div className="flex gap-2">
+                          <Slider
+                            value={[properties.brightness]}
+                            onValueChange={(val) => updateProperty('brightness', val[0])}
+                            min={-100}
+                            max={100}
+                            step={1}
+                            className="flex-1"
+                          />
+                          <Input
+                            type="number"
+                            value={properties.brightness}
+                            onChange={(e) => updateProperty('brightness', parseInt(e.target.value))}
+                            className="w-16"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Contrast</Label>
+                        <div className="flex gap-2">
+                          <Slider
+                            value={[properties.contrast]}
+                            onValueChange={(val) => updateProperty('contrast', val[0])}
+                            min={-100}
+                            max={100}
+                            step={1}
+                            className="flex-1"
+                          />
+                          <Input
+                            type="number"
+                            value={properties.contrast}
+                            onChange={(e) => updateProperty('contrast', parseInt(e.target.value))}
+                            className="w-16"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Saturation</Label>
+                        <div className="flex gap-2">
+                          <Slider
+                            value={[properties.saturation]}
+                            onValueChange={(val) => updateProperty('saturation', val[0])}
+                            min={-100}
+                            max={100}
+                            step={1}
+                            className="flex-1"
+                          />
+                          <Input
+                            type="number"
+                            value={properties.saturation}
+                            onChange={(e) => updateProperty('saturation', parseInt(e.target.value))}
+                            className="w-16"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="space-y-2">
+                        <Label>Blur</Label>
+                        <div className="flex gap-2">
+                          <Slider
+                            value={[properties.blur]}
+                            onValueChange={(val) => updateProperty('blur', val[0])}
+                            min={0}
+                            max={100}
+                            step={1}
+                            className="flex-1"
+                          />
+                          <Input
+                            type="number"
+                            value={properties.blur}
+                            onChange={(e) => updateProperty('blur', parseInt(e.target.value))}
+                            className="w-16"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </>
+                )}
               </>
             ) : (
               <div className="text-center py-12 text-slate-500 dark:text-slate-400">
