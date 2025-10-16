@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 
 const EditorContext = createContext(null);
 
@@ -15,11 +15,14 @@ export const EditorProvider = ({ children }) => {
   const [activeObject, setActiveObject] = useState(null);
   const [zoom, setZoom] = useState(100);
   const [canvasSize, setCanvasSize] = useState({ width: 1080, height: 1080 });
+  const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [history, setHistory] = useState([]);
   const [historyStep, setHistoryStep] = useState(0);
   const [layers, setLayers] = useState([]);
   const [selectedTemplate, setSelectedTemplate] = useState(null);
   const [isDarkMode, setIsDarkMode] = useState(false);
+  const [showGrid, setShowGrid] = useState(false);
+  const [clipboardObject, setClipboardObject] = useState(null);
   const canvasRef = useRef(null);
 
   const saveToHistory = useCallback(() => {
@@ -39,6 +42,7 @@ export const EditorProvider = ({ children }) => {
       canvas.loadFromJSON(prevState, () => {
         canvas.renderAll();
         setHistoryStep(prev => prev - 1);
+        updateLayers();
       });
     }
   }, [canvas, history, historyStep]);
@@ -49,6 +53,7 @@ export const EditorProvider = ({ children }) => {
       canvas.loadFromJSON(nextState, () => {
         canvas.renderAll();
         setHistoryStep(prev => prev + 1);
+        updateLayers();
       });
     }
   }, [canvas, history, historyStep]);
@@ -68,6 +73,88 @@ export const EditorProvider = ({ children }) => {
     }
   }, [canvas]);
 
+  const copyObject = useCallback(() => {
+    if (activeObject) {
+      setClipboardObject(activeObject);
+    }
+  }, [activeObject]);
+
+  const pasteObject = useCallback(() => {
+    if (clipboardObject && canvas) {
+      clipboardObject.clone((cloned) => {
+        cloned.set({
+          left: cloned.left + 20,
+          top: cloned.top + 20,
+        });
+        canvas.add(cloned);
+        canvas.setActiveObject(cloned);
+        canvas.renderAll();
+        saveToHistory();
+      });
+    }
+  }, [clipboardObject, canvas, saveToHistory]);
+
+  const deleteObject = useCallback(() => {
+    if (activeObject && canvas) {
+      canvas.remove(activeObject);
+      canvas.renderAll();
+      saveToHistory();
+    }
+  }, [activeObject, canvas, saveToHistory]);
+
+  const bringForward = useCallback(() => {
+    if (activeObject && canvas) {
+      canvas.bringForward(activeObject);
+      canvas.renderAll();
+      updateLayers();
+      saveToHistory();
+    }
+  }, [activeObject, canvas, updateLayers, saveToHistory]);
+
+  const sendBackward = useCallback(() => {
+    if (activeObject && canvas) {
+      canvas.sendBackwards(activeObject);
+      canvas.renderAll();
+      updateLayers();
+      saveToHistory();
+    }
+  }, [activeObject, canvas, updateLayers, saveToHistory]);
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Undo: Ctrl+Z / Cmd+Z
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        undo();
+      }
+      // Redo: Ctrl+Shift+Z / Cmd+Shift+Z or Ctrl+Y
+      if (((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'z') || 
+          ((e.ctrlKey || e.metaKey) && e.key === 'y')) {
+        e.preventDefault();
+        redo();
+      }
+      // Copy: Ctrl+C / Cmd+C
+      if ((e.ctrlKey || e.metaKey) && e.key === 'c' && activeObject) {
+        e.preventDefault();
+        copyObject();
+      }
+      // Paste: Ctrl+V / Cmd+V
+      if ((e.ctrlKey || e.metaKey) && e.key === 'v') {
+        e.preventDefault();
+        pasteObject();
+      }
+      // Delete: Delete or Backspace
+      if ((e.key === 'Delete' || e.key === 'Backspace') && activeObject) {
+        e.preventDefault();
+        deleteObject();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo, copyObject, pasteObject, deleteObject, activeObject]);
+
   const value = {
     canvas,
     setCanvas,
@@ -78,6 +165,8 @@ export const EditorProvider = ({ children }) => {
     setZoom,
     canvasSize,
     setCanvasSize,
+    backgroundColor,
+    setBackgroundColor,
     history,
     historyStep,
     saveToHistory,
@@ -88,7 +177,15 @@ export const EditorProvider = ({ children }) => {
     selectedTemplate,
     setSelectedTemplate,
     isDarkMode,
-    setIsDarkMode
+    setIsDarkMode,
+    showGrid,
+    setShowGrid,
+    copyObject,
+    pasteObject,
+    deleteObject,
+    bringForward,
+    sendBackward,
+    clipboardObject
   };
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
