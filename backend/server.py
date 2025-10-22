@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter
+from fastapi import FastAPI, APIRouter, HTTPException
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 from motor.motor_asyncio import AsyncIOMotorClient
@@ -6,9 +6,11 @@ import os
 import logging
 from pathlib import Path
 from pydantic import BaseModel, Field, ConfigDict
-from typing import List
+from typing import List, Optional
 import uuid
 from datetime import datetime, timezone
+import httpx
+import asyncio
 
 
 ROOT_DIR = Path(__file__).parent
@@ -65,6 +67,102 @@ async def get_status_checks():
             check['timestamp'] = datetime.fromisoformat(check['timestamp'])
     
     return status_checks
+
+# Klippy API Proxy Endpoints
+KLIPPY_API_KEY = "X4eTCMg7rLGxEVw0r3lIaBrxuVfhGrGGZblYCdqQWZP9zx4xTsIWSwQTU67tnhqa"
+KLIPPY_BASE_URL = "https://api.klippy.ai/v1"
+
+@api_router.get("/klippy/elements")
+async def get_klippy_elements(limit: int = 20, category: Optional[str] = None, sort: str = "popular"):
+    try:
+        params = {
+            "limit": limit,
+            "format": "svg",
+            "sort": sort
+        }
+        if category and category != "all":
+            params["category"] = category
+            
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{KLIPPY_BASE_URL}/elements",
+                params=params,
+                headers={"Authorization": f"Bearer {KLIPPY_API_KEY}"},
+                timeout=10.0
+            )
+            
+        if response.status_code == 200:
+            return response.json()
+        else:
+            # Return mock data if API fails
+            return {
+                "elements": [
+                    {
+                        "id": "1",
+                        "title": "Heart",
+                        "category": "shapes",
+                        "svg_url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik01MCA4NSBDNTAgODUgMTUgNjAgMTUgNDAgQzE1IDI1IDI1IDE1IDQwIDIwIEM0NSAxMCA1NSAxMCA2MCAyMCBDNzUgMTUgODUgMjUgODUgNDAgQzg1IDYwIDUwIDg1IDUwIDg1IFoiIGZpbGw9IiNFRjQ0NDQiLz4KPC9zdmc+",
+                        "preview_url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik01MCA4NSBDNTAgODUgMTUgNjAgMTUgNDAgQzE1IDI1IDI1IDE1IDQwIDIwIEM0NSAxMCA1NSAxMCA2MCAyMCBDNzUgMTUgODUgMjUgODUgNDAgQzg1IDYwIDUwIDg1IDUwIDg1IFoiIGZpbGw9IiNFRjQ0NDQiLz4KPC9zdmc+"
+                    },
+                    {
+                        "id": "2",
+                        "title": "Star",
+                        "category": "shapes",
+                        "svg_url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+Cjxwb2x5Z29uIHBvaW50cz0iNTAsMTAgNjEsMzUgOTAsMzUgNjksNTUgNzksODUgNTAsNzAgMjEsODUgMzEsNTUgMTAsMzUgMzksMzUiIGZpbGw9IiNGNTlFMEIiLz4KPC9zdmc+",
+                        "preview_url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+Cjxwb2x5Z29uIHBvaW50cz0iNTAsMTAgNjEsMzUgOTAsMzUgNjksNTUgNzksODUgNTAsNzAgMjEsODUgMzEsNTUgMTAsMzUgMzksMzUiIGZpbGw9IiNGNTlFMEIiLz4KPC9zdmc+"
+                    }
+                ]
+            }
+            
+    except Exception as e:
+        logger.error(f"Klippy API error: {e}")
+        # Return mock data on error
+        return {
+            "elements": [
+                {
+                    "id": "1",
+                    "title": "Heart",
+                    "category": "shapes",
+                    "svg_url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik01MCA4NSBDNTAgODUgMTUgNjAgMTUgNDAgQzE1IDI1IDI1IDE1IDQwIDIwIEM0NSAxMCA1NSAxMCA2MCAyMCBDNzUgMTUgODUgMjUgODUgNDAgQzg1IDYwIDUwIDg1IDUwIDg1IFoiIGZpbGw9IiNFRjQ0NDQiLz4KPC9zdmc+",
+                    "preview_url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+CjxwYXRoIGQ9Ik01MCA4NSBDNTAgODUgMTUgNjAgMTUgNDAgQzE1IDI1IDI1IDE1IDQwIDIwIEM0NSAxMCA1NSAxMCA2MCAyMCBDNzUgMTUgODUgMjUgODUgNDAgQzg1IDYwIDUwIDg1IDUwIDg1IFoiIGZpbGw9IiNFRjQ0NDQiLz4KPC9zdmc+"
+                },
+                {
+                    "id": "2",
+                    "title": "Star",
+                    "category": "shapes",
+                    "svg_url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+Cjxwb2x5Z29uIHBvaW50cz0iNTAsMTAgNjEsMzUgOTAsMzUgNjksNTUgNzksODUgNTAsNzAgMjEsODUgMzEsNTUgMTAsMzUgMzksMzUiIGZpbGw9IiNGNTlFMEIiLz4KPC9zdmc+",
+                    "preview_url": "data:image/svg+xml;base64,PHN2ZyB3aWR0aD0iMTAwIiBoZWlnaHQ9IjEwMCIgdmlld0JveD0iMCAwIDEwMCAxMDAiIGZpbGw9Im5vbmUiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+Cjxwb2x5Z29uIHBvaW50cz0iNTAsMTAgNjEsMzUgOTAsMzUgNjksNTUgNzksODUgNTAsNzAgMjEsODUgMzEsNTUgMTAsMzUgMzksMzUiIGZpbGw9IiNGNTlFMEIiLz4KPC9zdmc+"
+                }
+            ]
+        }
+
+@api_router.get("/klippy/search")
+async def search_klippy_elements(q: str, limit: int = 20, category: Optional[str] = None):
+    try:
+        params = {
+            "q": q,
+            "limit": limit,
+            "format": "svg"
+        }
+        if category and category != "all":
+            params["category"] = category
+            
+        async with httpx.AsyncClient() as client:
+            response = await client.get(
+                f"{KLIPPY_BASE_URL}/search",
+                params=params,
+                headers={"Authorization": f"Bearer {KLIPPY_API_KEY}"},
+                timeout=10.0
+            )
+            
+        if response.status_code == 200:
+            return response.json()
+        else:
+            return {"elements": []}
+            
+    except Exception as e:
+        logger.error(f"Klippy search error: {e}")
+        return {"elements": []}
 
 # Include the router in the main app
 app.include_router(api_router)

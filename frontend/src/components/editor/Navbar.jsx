@@ -1,7 +1,7 @@
 import React from 'react';
 import { Button } from '../ui/button';
 import { useEditor } from '../../contexts/EditorContext';
-import { Undo, Redo, Download, Save, Plus, ZoomIn, ZoomOut, Moon, Sun, Grid3x3, ArrowUp, ArrowDown, Copy, Trash2, Keyboard } from 'lucide-react';
+import { Undo, Redo, Download, Save, Plus, ZoomIn, ZoomOut, Moon, Sun, Grid3x3, ArrowUp, ArrowDown, Copy, Trash2, Keyboard, RotateCcw, Maximize2, Layers, RotateCw } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Toaster } from '../ui/sonner';
@@ -12,20 +12,16 @@ import {
 } from '../ui/popover';
 
 const Navbar = () => {
-  const { canvas, undo, redo, zoom, setZoom, isDarkMode, setIsDarkMode, saveToHistory, showGrid, setShowGrid, activeObject, bringForward, sendBackward, copyObject, deleteObject } = useEditor();
+  const { canvas, undo, redo, zoom, setZoom, isDarkMode, setIsDarkMode, saveToHistory, showGrid, setShowGrid, activeObject, bringForward, sendBackward, copyObject, deleteObject, exportCanvas, duplicateObject, centerObject, resetCanvas, isLoading, rotateCanvas } = useEditor();
 
-  const handleExport = () => {
-    if (canvas) {
-      const dataURL = canvas.toDataURL({
-        format: 'png',
-        quality: 1,
-        multiplier: 2
+  const handleExport = async () => {
+    try {
+      await exportCanvas('png', 1);
+      toast.success('Design exported successfully!', {
+        icon: '📥'
       });
-      const link = document.createElement('a');
-      link.download = `design-${Date.now()}.png`;
-      link.href = dataURL;
-      link.click();
-      toast.success('Design exported successfully!');
+    } catch (error) {
+      toast.error('Failed to export design');
     }
   };
 
@@ -38,12 +34,11 @@ const Navbar = () => {
   };
 
   const handleNew = () => {
-    if (canvas) {
-      canvas.clear();
-      canvas.backgroundColor = '#ffffff';
-      canvas.renderAll();
-      saveToHistory();
-      toast.success('New canvas created!');
+    if (window.confirm('Are you sure you want to create a new canvas? All unsaved changes will be lost.')) {
+      resetCanvas();
+      toast.success('New canvas created!', {
+        icon: '✨'
+      });
     }
   };
 
@@ -87,13 +82,25 @@ const Navbar = () => {
             <Plus className="w-4 h-4" />
             New
           </Button>
+          <Button onClick={() => rotateCanvas('left')} variant="outline" size="sm" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" title="Rotate Left">
+            <RotateCcw className="w-4 h-4" />
+          </Button>
+          <Button onClick={() => rotateCanvas('right')} variant="outline" size="sm" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" title="Rotate Right">
+            <RotateCw className="w-4 h-4" />
+          </Button>
           <Button onClick={handleSave} variant="outline" size="sm" className="gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
             <Save className="w-4 h-4" />
             Save
           </Button>
-          <Button onClick={handleExport} variant="default" size="sm" className="gap-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 transition-all">
-            <Download className="w-4 h-4" />
-            Export
+          <Button 
+            onClick={handleExport} 
+            variant="default" 
+            size="sm" 
+            className="gap-2 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 transition-all disabled:opacity-50"
+            disabled={isLoading}
+          >
+            <Download className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
+            {isLoading ? 'Exporting...' : 'Export'}
           </Button>
 
           <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 mx-2" />
@@ -111,6 +118,12 @@ const Navbar = () => {
             <>
               <Button onClick={copyObject} variant="ghost" size="icon" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" title="Copy (Ctrl+C)">
                 <Copy className="w-4 h-4" />
+              </Button>
+              <Button onClick={duplicateObject} variant="ghost" size="icon" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" title="Duplicate">
+                <Layers className="w-4 h-4" />
+              </Button>
+              <Button onClick={centerObject} variant="ghost" size="icon" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" title="Center Object">
+                <Maximize2 className="w-4 h-4" />
               </Button>
               <Button onClick={bringForward} variant="ghost" size="icon" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" title="Bring Forward">
                 <ArrowUp className="w-4 h-4" />
@@ -174,6 +187,14 @@ const Navbar = () => {
                   <div className="flex justify-between">
                     <span className="text-slate-600 dark:text-slate-400">Delete</span>
                     <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded">Del</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600 dark:text-slate-400">Duplicate</span>
+                    <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded">Ctrl+D</kbd>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-slate-600 dark:text-slate-400">Select All</span>
+                    <kbd className="px-2 py-1 bg-slate-100 dark:bg-slate-800 rounded">Ctrl+A</kbd>
                   </div>
                 </div>
               </div>

@@ -7,13 +7,154 @@ import { Input } from '../ui/input';
 import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, Wand2 } from 'lucide-react';
-import { motion } from 'framer-motion';
+import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, Wand2, GripVertical, Group, Ungroup, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react';
+import { motion, Reorder } from 'framer-motion';
 import { toast } from '../ui/sonner';
 import { filters } from 'fabric';
+import * as fabric from 'fabric';
+import { allGoogleFonts, loadGoogleFont, searchFonts } from '../../utils/googleFonts';
+
+const LayerItem = ({ layer, index, selectedLayers, selectLayer, toggleLayerVisibility, toggleLayerLock, expandedGroups, toggleGroupExpansion, reorderLayers, ungroupLayer }) => {
+  const isExpanded = expandedGroups.has(layer.id);
+  const isSelected = selectedLayers.includes(layer.id);
+
+  return (
+    <Reorder.Item key={layer.id} value={layer}>
+      <motion.div
+        whileHover={{ x: 4 }}
+        className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${
+          isSelected
+            ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+            : 'border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 bg-slate-50 dark:bg-slate-800'
+        }`}
+      >
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            selectLayer(layer.id);
+          }}
+          variant="ghost"
+          size="icon"
+          className="h-6 w-6 p-0"
+        >
+          {isSelected ? (
+            <CheckSquare className="w-4 h-4 text-indigo-600" />
+          ) : (
+            <Square className="w-4 h-4 text-slate-400" />
+          )}
+        </Button>
+        
+        {layer.isGroup && (
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleGroupExpansion(layer.id);
+            }}
+            variant="ghost"
+            size="icon"
+            className="h-6 w-6 p-0"
+          >
+            {isExpanded ? (
+              <ChevronDown className="w-4 h-4 text-slate-400" />
+            ) : (
+              <ChevronRight className="w-4 h-4 text-slate-400" />
+            )}
+          </Button>
+        )}
+        
+        <GripVertical className="w-4 h-4 text-slate-400 cursor-grab active:cursor-grabbing" />
+        <div className="flex-1">
+          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+            {layer.name}
+            {layer.isGroup && ` (${layer.children.length})`}
+          </p>
+          <p className="text-xs text-slate-500 dark:text-slate-400">{layer.type}</p>
+        </div>
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleLayerVisibility(index);
+          }}
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+        >
+          {layer.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+        </Button>
+        <Button
+          onClick={(e) => {
+            e.stopPropagation();
+            toggleLayerLock(index);
+          }}
+          variant="ghost"
+          size="icon"
+          className="h-8 w-8"
+        >
+          {layer.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+        </Button>
+        {layer.isGroup && (
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              ungroupLayer(layer.id);
+            }}
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+            title="Ungroup"
+          >
+            <Ungroup className="w-4 h-4" />
+          </Button>
+        )}
+      </motion.div>
+      
+      {layer.isGroup && isExpanded && layer.children.length > 0 && (
+        <div className="ml-4 mt-2 space-y-2">
+          {layer.children.map((childLayer, childIndex) => (
+            <LayerItem
+              key={childLayer.id}
+              layer={childLayer}
+              index={index}
+              selectedLayers={selectedLayers}
+              selectLayer={selectLayer}
+              toggleLayerVisibility={toggleLayerVisibility}
+              toggleLayerLock={toggleLayerLock}
+              expandedGroups={expandedGroups}
+              toggleGroupExpansion={toggleGroupExpansion}
+              reorderLayers={reorderLayers}
+              ungroupLayer={ungroupLayer}
+            />
+          ))}
+        </div>
+      )}
+    </Reorder.Item>
+  );
+};
 
 const RightSidebar = () => {
-  const { canvas, activeObject, layers, saveToHistory, updateLayers } = useEditor();
+  const { 
+    canvas, 
+    activeObject, 
+    layers, 
+    saveToHistory, 
+    updateLayers, 
+    groupObjects, 
+    ungroupObjects,
+    selectedLayers,
+    selectLayer,
+    selectAllLayers,
+    clearLayerSelection,
+    groupSelectedLayers,
+    expandedGroups,
+    toggleGroupExpansion,
+    ungroupLayer,
+    maskWithShape,
+    maskWithText,
+    removeMask
+  } = useEditor();
+  const [fontSearch, setFontSearch] = useState('');
+  const [filteredFonts, setFilteredFonts] = useState(allGoogleFonts.slice(0, 100));
+  const [maskText, setMaskText] = useState('TEXT');
   const [properties, setProperties] = useState({
     fill: '#000000',
     stroke: '#000000',
@@ -48,9 +189,21 @@ const RightSidebar = () => {
     }
   }, [activeObject]);
 
-  const updateProperty = (key, value) => {
+  useEffect(() => {
+    const filtered = fontSearch ? 
+      searchFonts(fontSearch, allGoogleFonts).slice(0, 100) : 
+      allGoogleFonts.slice(0, 100);
+    setFilteredFonts(filtered);
+  }, [fontSearch]);
+
+  const updateProperty = async (key, value) => {
     if (activeObject && canvas) {
-      if (key === 'opacity') {
+      if (key === 'fontFamily') {
+        await loadGoogleFont(value);
+        activeObject.set(key, value);
+        activeObject.set('dirty', true);
+        canvas.requestRenderAll();
+      } else if (key === 'opacity') {
         activeObject.set(key, value / 100);
       } else if (['brightness', 'contrast', 'saturation', 'blur'].includes(key)) {
         activeObject.set(key, value);
@@ -94,24 +247,102 @@ const RightSidebar = () => {
     if (activeObject && canvas) {
       canvas.remove(activeObject);
       canvas.renderAll();
+      updateLayers();
       saveToHistory();
-      toast.success('Object deleted');
+
     }
   };
 
   const duplicateObject = () => {
     if (activeObject && canvas) {
-      activeObject.clone((cloned) => {
-        cloned.set({
-          left: cloned.left + 20,
-          top: cloned.top + 20,
+      const objData = {
+        left: activeObject.left + 20,
+        top: activeObject.top + 20,
+        width: activeObject.width,
+        height: activeObject.height,
+        fill: activeObject.fill,
+        stroke: activeObject.stroke,
+        strokeWidth: activeObject.strokeWidth,
+        opacity: activeObject.opacity,
+        angle: activeObject.angle,
+        scaleX: activeObject.scaleX,
+        scaleY: activeObject.scaleY
+      };
+      
+      let newObj;
+      if (activeObject.type === 'textbox') {
+        newObj = new fabric.Textbox(activeObject.text, {
+          left: activeObject.left + 20,
+          top: activeObject.top + 20,
+          width: activeObject.width,
+          fontSize: activeObject.fontSize,
+          fontFamily: activeObject.fontFamily,
+          fontWeight: activeObject.fontWeight,
+          textAlign: activeObject.textAlign,
+          fill: activeObject.fill
         });
-        canvas.add(cloned);
-        canvas.setActiveObject(cloned);
+      } else if (activeObject.type === 'rect') {
+        newObj = new fabric.Rect(objData);
+      } else if (activeObject.type === 'circle') {
+        newObj = new fabric.Circle({ 
+          left: activeObject.left + 20,
+          top: activeObject.top + 20,
+          radius: activeObject.radius,
+          fill: activeObject.fill
+        });
+      } else if (activeObject.type === 'triangle') {
+        newObj = new fabric.Triangle(objData);
+      } else if (activeObject.type === 'ellipse') {
+        newObj = new fabric.Ellipse({ 
+          left: activeObject.left + 20,
+          top: activeObject.top + 20,
+          rx: activeObject.rx, 
+          ry: activeObject.ry,
+          fill: activeObject.fill
+        });
+      } else if (activeObject.type === 'polygon') {
+        newObj = new fabric.Polygon(activeObject.points, {
+          left: activeObject.left + 20,
+          top: activeObject.top + 20,
+          fill: activeObject.fill
+        });
+      } else if (activeObject.type === 'text') {
+        newObj = new fabric.Text(activeObject.text, {
+          left: activeObject.left + 20,
+          top: activeObject.top + 20,
+          fontSize: activeObject.fontSize,
+          fontFamily: activeObject.fontFamily,
+          fill: activeObject.fill
+        });
+      } else if (activeObject.type === 'image') {
+        const imgElement = activeObject.getElement();
+        fabric.FabricImage.fromURL(imgElement.src, { crossOrigin: 'anonymous' }).then((img) => {
+          img.set({
+            left: activeObject.left + 20,
+            top: activeObject.top + 20,
+            scaleX: activeObject.scaleX,
+            scaleY: activeObject.scaleY,
+            angle: activeObject.angle,
+            opacity: activeObject.opacity
+          });
+          canvas.add(img);
+          canvas.setActiveObject(img);
+          canvas.renderAll();
+          updateLayers();
+          saveToHistory();
+
+        });
+        return;
+      }
+      
+      if (newObj) {
+        canvas.add(newObj);
+        canvas.setActiveObject(newObj);
         canvas.renderAll();
+        updateLayers();
         saveToHistory();
-        toast.success('Object duplicated');
-      });
+
+      }
     }
   };
 
@@ -119,14 +350,7 @@ const RightSidebar = () => {
     updateProperty('textAlign', align);
   };
 
-  const selectLayer = (index) => {
-    if (canvas) {
-      const objects = canvas.getObjects();
-      const obj = objects[objects.length - 1 - index];
-      canvas.setActiveObject(obj);
-      canvas.renderAll();
-    }
-  };
+
 
   const toggleLayerVisibility = (index) => {
     if (canvas) {
@@ -149,31 +373,116 @@ const RightSidebar = () => {
     }
   };
 
-  const moveLayer = (index, direction) => {
+  const reorderLayers = (newLayers) => {
     if (canvas) {
       const objects = canvas.getObjects();
-      const actualIndex = objects.length - 1 - index;
-      const obj = objects[actualIndex];
       
-      if (direction === 'up' && actualIndex < objects.length - 1) {
-        canvas.moveTo(obj, actualIndex + 1);
-      } else if (direction === 'down' && actualIndex > 0) {
-        canvas.moveTo(obj, actualIndex - 1);
+      // Create mapping from current objects to their layer info
+      const objectMap = new Map();
+      objects.forEach((obj, index) => {
+        const layerId = `layer-${objects.length - 1 - index}`; // Match the layer ID generation in updateLayers
+        objectMap.set(layerId, obj);
+      });
+      
+      // Map new layer order to objects (layers are top-to-bottom, canvas is bottom-to-top)
+      const reorderedObjects = [];
+      for (let i = newLayers.length - 1; i >= 0; i--) {
+        const obj = objectMap.get(newLayers[i].id);
+        if (obj) {
+          reorderedObjects.push(obj);
+        }
       }
+      
+      // Clear and re-add in new order
+      canvas.clear();
+      reorderedObjects.forEach(obj => canvas.add(obj));
       canvas.renderAll();
       updateLayers();
       saveToHistory();
     }
   };
 
+const setAsBackground = () => {
+    if (activeObject && activeObject.type === 'image' && canvas) {
+
+      const objects = canvas.getObjects();
+      const existingBg = objects.find(obj => obj.isBackgroundImage);
+      if (existingBg) {
+        canvas.remove(existingBg);
+      }
+      
+     
+      const imgElement = activeObject.getElement();
+      
+   
+      fabric.FabricImage.fromURL(imgElement.src, { crossOrigin: 'anonymous' }).then((img) => {
+ 
+        const canvasWidth = canvas.width || 1080;
+        const canvasHeight = canvas.height || 1080;
+        
+
+        const actualCanvasWidth = canvasWidth / (canvas.getZoom() || 1);
+        const actualCanvasHeight = canvasHeight / (canvas.getZoom() || 1);
+        
+     
+        const imgWidth = img.width;
+        const imgHeight = img.height;
+        
+        const scaleX = actualCanvasWidth / imgWidth;
+        const scaleY = actualCanvasHeight / imgHeight;
+        const scale = Math.max(scaleX, scaleY);
+        
+        // Calculate the scaled dimensions
+        const scaledWidth = imgWidth * scale;
+        const scaledHeight = imgHeight * scale;
+        
+        // Calculate position to center the image
+        const left = (actualCanvasWidth - scaledWidth) / 2;
+        const top = (actualCanvasHeight - scaledHeight) / 2;
+        
+        // Set image properties for background
+        img.set({
+          left: left,
+          top: top,
+          originX: 'left',
+          originY: 'top',
+          scaleX: scale,
+          scaleY: scale,
+          selectable: false,
+          evented: false,
+          isBackgroundImage: true,
+          objectCaching: false
+        });
+        
+        // Remove the old active object
+        canvas.remove(activeObject);
+        
+        // Get all remaining objects
+        const remainingObjects = canvas.getObjects();
+        
+        // Clear canvas and add background first
+        canvas.clear();
+        canvas.add(img);
+        
+        // Add all other objects on top
+        remainingObjects.forEach(obj => canvas.add(obj));
+        
+        canvas.discardActiveObject();
+        canvas.renderAll();
+        updateLayers();
+        saveToHistory();
+
+      });
+    }
+  };
   return (
     <motion.div
       initial={{ x: 20, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      className="w-80 border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col"
+      className="w-80 h-screen border-l border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 flex flex-col"
     >
-      <Tabs defaultValue="properties" className="flex-1 flex flex-col">
-        <TabsList className="grid grid-cols-2 m-4 h-auto p-1 bg-slate-100 dark:bg-slate-800">
+      <Tabs defaultValue="properties" className="flex-1 flex flex-col h-full">
+        <TabsList className="grid grid-cols-2 m-4 h-auto p-1 bg-slate-100 dark:bg-slate-800 flex-shrink-0">
           <TabsTrigger value="properties" className="flex gap-2 py-2 data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700">
             <Settings className="w-4 h-4" />
             <span className="text-sm">Properties</span>
@@ -184,7 +493,7 @@ const RightSidebar = () => {
           </TabsTrigger>
         </TabsList>
 
-        <ScrollArea className="flex-1 px-4">
+        <ScrollArea className="flex-1 px-4 pb-6 overflow-y-auto">
           <TabsContent value="properties" className="mt-0 space-y-6">
             {activeObject ? (
               <>
@@ -203,18 +512,46 @@ const RightSidebar = () => {
                   <>
                     <div className="space-y-2">
                       <Label>Font Family</Label>
-                      <Select value={properties.fontFamily} onValueChange={(val) => updateProperty('fontFamily', val)}>
-                        <SelectTrigger>
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="Inter">Inter</SelectItem>
-                          <SelectItem value="Poppins">Poppins</SelectItem>
-                          <SelectItem value="Roboto">Roboto</SelectItem>
-                          <SelectItem value="Playfair Display">Playfair Display</SelectItem>
-                          <SelectItem value="Montserrat">Montserrat</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="space-y-2">
+                        <div className="relative">
+                          <Input
+                            type="text"
+                            placeholder="Search fonts..."
+                            value={fontSearch}
+                            onChange={(e) => setFontSearch(e.target.value)}
+                            className="text-sm"
+                          />
+                          {fontSearch && (
+                            <div className="absolute top-full left-0 right-0 z-50 mt-1 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg max-h-60 overflow-y-auto">
+                              {filteredFonts.slice(0, 10).map((font) => (
+                                <button
+                                  key={font}
+                                  onClick={() => {
+                                    updateProperty('fontFamily', font);
+                                    setFontSearch('');
+                                  }}
+                                  className="w-full text-left px-3 py-2 hover:bg-slate-100 dark:hover:bg-slate-700 text-sm border-b border-slate-100 dark:border-slate-700 last:border-b-0"
+                                  style={{ fontFamily: font }}
+                                >
+                                  {font}
+                                </button>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                        <Select value={properties.fontFamily} onValueChange={(val) => updateProperty('fontFamily', val)}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent className="max-h-80 overflow-y-auto">
+                            {allGoogleFonts.slice(0, 50).map((font) => (
+                              <SelectItem key={font} value={font} style={{ fontFamily: font }}>
+                                {font}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </div>
 
                     <div className="space-y-2">
@@ -366,6 +703,61 @@ const RightSidebar = () => {
                 {activeObject.type === 'image' && (
                   <>
                     <div className="space-y-4">
+                      <div className="space-y-2">
+                        <Label>Image Actions</Label>
+                        <div className="space-y-2">
+                          <Button 
+                            onClick={() => setAsBackground()}
+                            variant="outline" 
+                            className="w-full gap-2"
+                          >
+                            Set as Background
+                          </Button>
+                          <div className="space-y-2">
+                            <Label>Mask with Shape</Label>
+                            <div className="flex gap-2">
+                              <Button 
+                                onClick={() => maskWithShape && maskWithShape('circle')}
+                                variant="outline" 
+                                className="flex-1"
+                              >
+                                Circle
+                              </Button>
+                              <Button 
+                                onClick={() => maskWithShape && maskWithShape('rectangle')}
+                                variant="outline" 
+                                className="flex-1"
+                              >
+                                Rectangle
+                              </Button>
+                            </div>
+                            <Label>Mask with Text</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                type="text"
+                                value={maskText}
+                                onChange={(e) => setMaskText(e.target.value)}
+                                placeholder="Enter text"
+                                className="flex-1"
+                              />
+                              <Button 
+                                onClick={() => maskWithText && maskWithText(maskText)}
+                                variant="outline"
+                              >
+                                Apply
+                              </Button>
+                            </div>
+                            <Button 
+                              onClick={() => removeMask && removeMask()}
+                              variant="outline" 
+                              className="w-full"
+                            >
+                              Remove Mask
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                      
                       <div className="flex items-center gap-2 mb-3">
                         <Wand2 className="w-4 h-4" />
                         <Label className="font-semibold">Image Filters</Label>
@@ -463,43 +855,59 @@ const RightSidebar = () => {
           </TabsContent>
 
           <TabsContent value="layers" className="mt-0 space-y-2">
-            <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 mb-3">Layers</h3>
-            {layers.length > 0 ? (
-              layers.map((layer, index) => (
-                <motion.div
-                  key={layer.id}
-                  whileHover={{ x: 4 }}
-                  onClick={() => selectLayer(index)}
-                  className="flex items-center gap-2 p-3 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 cursor-pointer transition-colors bg-slate-50 dark:bg-slate-800"
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300">Layers</h3>
+              <div className="flex gap-1">
+                <Button
+                  onClick={selectAllLayers}
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs"
                 >
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-slate-900 dark:text-slate-100">{layer.name}</p>
-                    <p className="text-xs text-slate-500 dark:text-slate-400">{layer.type}</p>
-                  </div>
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleLayerVisibility(index);
-                    }}
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                  >
-                    {layer.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-                  </Button>
-                  <Button
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      toggleLayerLock(index);
-                    }}
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8"
-                  >
-                    {layer.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-                  </Button>
-                </motion.div>
-              ))
+                  Select All
+                </Button>
+                <Button
+                  onClick={clearLayerSelection}
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 px-2 text-xs"
+                >
+                  Clear
+                </Button>
+              </div>
+            </div>
+            
+            {selectedLayers.length >= 2 && (
+              <div className="flex gap-2 mb-3 p-2 bg-indigo-50 dark:bg-indigo-900/20 rounded-lg border border-indigo-200 dark:border-indigo-800">
+                <Button
+                  onClick={groupSelectedLayers}
+                  size="sm"
+                  className="flex-1 gap-2 h-8 text-xs"
+                >
+                  <Group className="w-3 h-3" />
+                  Group Selected ({selectedLayers.length})
+                </Button>
+              </div>
+            )}
+
+            {layers.length > 0 ? (
+              <Reorder.Group axis="y" values={layers} onReorder={reorderLayers} className="space-y-2">
+                {layers.map((layer, index) => (
+                  <LayerItem
+                    key={layer.id}
+                    layer={layer}
+                    index={index}
+                    selectedLayers={selectedLayers}
+                    selectLayer={selectLayer}
+                    toggleLayerVisibility={toggleLayerVisibility}
+                    toggleLayerLock={toggleLayerLock}
+                    expandedGroups={expandedGroups}
+                    toggleGroupExpansion={toggleGroupExpansion}
+                    reorderLayers={reorderLayers}
+                    ungroupLayer={ungroupLayer}
+                  />
+                ))}
+              </Reorder.Group>
             ) : (
               <div className="text-center py-12 text-slate-500 dark:text-slate-400">
                 <Layers className="w-12 h-12 mx-auto mb-3 opacity-50" />
