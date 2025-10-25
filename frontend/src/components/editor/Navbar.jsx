@@ -12,7 +12,7 @@ import {
 } from '../ui/popover';
 
 const Navbar = () => {
-  const { canvas, undo, redo, zoom, setZoom, isDarkMode, setIsDarkMode, saveToHistory, showGrid, setShowGrid, activeObject, bringForward, sendBackward, copyObject, deleteObject, exportCanvas, duplicateObject, centerObject, resetCanvas, isLoading, rotateCanvas } = useEditor();
+  const { canvas, undo, redo, zoom, setZoom, isDarkMode, setIsDarkMode, saveToHistory, showGrid, setShowGrid, activeObject, bringForward, sendBackward, copyObject, deleteObject, exportCanvas, duplicateObject, centerObject, resetCanvas, isLoading, rotateCanvas, history, historyStep } = useEditor();
 
   const handleExport = async () => {
     try {
@@ -105,10 +105,24 @@ const Navbar = () => {
 
           <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 mx-2" />
 
-          <Button onClick={undo} variant="ghost" size="icon" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+          <Button 
+            onClick={undo} 
+            variant="ghost" 
+            size="icon" 
+            className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={historyStep <= 0}
+            title="Undo (Ctrl+Z)"
+          >
             <Undo className="w-4 h-4" />
           </Button>
-          <Button onClick={redo} variant="ghost" size="icon" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+          <Button 
+            onClick={redo} 
+            variant="ghost" 
+            size="icon" 
+            className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+            disabled={historyStep >= history.length - 1}
+            title="Redo (Ctrl+Y)"
+          >
             <Redo className="w-4 h-4" />
           </Button>
 

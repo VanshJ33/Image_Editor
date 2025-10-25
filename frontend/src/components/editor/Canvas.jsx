@@ -1,11 +1,18 @@
-import React, { useEffect, useRef, useCallback } from 'react';
-import { Canvas as FabricCanvas, Line } from 'fabric';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
+import { Canvas as FabricCanvas, Line, FabricImage, Rect } from 'fabric';
 import { useEditor } from '../../contexts/EditorContext';
 import { motion } from 'framer-motion';
+import ContextMenu from './ContextMenu';
+import CropDialog from './CropDialog';
+import { toast } from 'sonner';
+import * as fabric from 'fabric';
+import { ActiveSelection } from 'fabric';
 
 const Canvas = () => {
-  const { canvas, setCanvas, canvasRef, setActiveObject, saveToHistory, updateLayers, canvasSize, zoom, setZoom, backgroundColor, showGrid, canvasRotation } = useEditor();
+  const { canvas, setCanvas, canvasRef, setActiveObject, saveToHistory, updateLayers, canvasSize, zoom, setZoom, backgroundColor, showGrid, canvasRotation, activeObject, undo, redo } = useEditor();
   const containerRef = useRef(null);
+  const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
+  const [cropDialog, setCropDialog] = useState({ open: false, imageObject: null });
 
   useEffect(() => {
     if (canvasRef.current && !canvas) {
@@ -92,10 +99,33 @@ const Canvas = () => {
       fabricCanvas.on('object:modified', debouncedSave);
       fabricCanvas.on('object:added', () => updateLayers());
       fabricCanvas.on('object:removed', () => updateLayers());
+      
+      // Right-click context menu
+      const handleContextMenu = (e) => {
+        e.preventDefault();
+        if (fabricCanvas.getActiveObject()) {
+          setContextMenu({
+            visible: true,
+            x: e.clientX,
+            y: e.clientY
+          });
+        }
+      };
+      
+      const handleClick = (e) => {
+        if (e.button !== 2) {
+          setContextMenu({ visible: false, x: 0, y: 0 });
+        }
+      };
+      
+      fabricCanvas.wrapperEl.addEventListener('contextmenu', handleContextMenu);
+      fabricCanvas.wrapperEl.addEventListener('mousedown', handleClick);
 
       setCanvas(fabricCanvas);
 
       return () => {
+        fabricCanvas.wrapperEl?.removeEventListener('contextmenu', handleContextMenu);
+        fabricCanvas.wrapperEl?.removeEventListener('mousedown', handleClick);
         fabricCanvas.dispose();
       };
     }
@@ -207,6 +237,316 @@ const Canvas = () => {
       canvas.renderAll();
     }
   }, [showGrid, canvas, canvasSize]);
+  
+  const handleContextMenuAction = (action) => {
+    if (!activeObject || !canvas) return;
+    
+    switch (action) {
+      case 'duplicate':
+        activeObject.clone().then((cloned) => {
+          cloned.set({
+            left: activeObject.left + 20,
+            top: activeObject.top + 20
+          });
+          canvas.add(cloned);
+          canvas.setActiveObject(cloned);
+          canvas.renderAll();
+          updateLayers();
+          saveToHistory();
+          toast.success('Object duplicated');
+        });
+        break;
+        
+      case 'delete':
+        canvas.remove(activeObject);
+        canvas.renderAll();
+        updateLayers();
+        saveToHistory();
+        toast.success('Object deleted');
+        break;
+        
+      case 'lock':
+        activeObject.set({
+          selectable: !activeObject.selectable,
+          evented: !activeObject.evented
+        });
+        canvas.renderAll();
+        updateLayers();
+        toast.success(activeObject.selectable ? 'Object unlocked' : 'Object locked');
+        break;
+        
+      case 'visibility':
+        activeObject.set('visible', !activeObject.visible);
+        canvas.renderAll();
+        updateLayers();
+        toast.success(activeObject.visible ? 'Object shown' : 'Object hidden');
+        break;
+        
+      case 'bringToFront':
+        canvas.bringObjectToFront(activeObject);
+        canvas.renderAll();
+        updateLayers();
+        saveToHistory();
+        toast.success('Brought to front');
+        break;
+        
+      case 'sendToBack':
+        canvas.sendObjectToBack(activeObject);
+        canvas.renderAll();
+        updateLayers();
+        saveToHistory();
+        toast.success('Sent to back');
+        break;
+        
+      case 'flipHorizontal':
+        activeObject.set('flipX', !activeObject.flipX);
+        canvas.renderAll();
+        saveToHistory();
+        toast.success('Flipped horizontally');
+        break;
+        
+      case 'flipVertical':
+        activeObject.set('flipY', !activeObject.flipY);
+        canvas.renderAll();
+        saveToHistory();
+        toast.success('Flipped vertically');
+        break;
+        
+      case 'rotate90':
+        activeObject.set('angle', (activeObject.angle || 0) + 90);
+        canvas.renderAll();
+        saveToHistory();
+        toast.success('Rotated 90°');
+        break;
+        
+        
+      case 'setBackground':
+        if (activeObject.type === 'image') {
+          const imgElement = activeObject.getElement();
+          FabricImage.fromURL(imgElement.src, { crossOrigin: 'anonymous' }).then((img) => {
+            const canvasWidth = canvas.width;
+            const canvasHeight = canvas.height;
+            const scaleX = canvasWidth / img.width;
+            const scaleY = canvasHeight / img.height;
+            const scale = Math.max(scaleX, scaleY);
+            
+            img.set({
+              left: 0,
+              top: 0,
+              scaleX: scale,
+              scaleY: scale,
+              selectable: false,
+              evented: false,
+              isBackgroundImage: true
+            });
+            
+            const existingBg = canvas.getObjects().find(obj => obj.isBackgroundImage);
+            if (existingBg) canvas.remove(existingBg);
+            
+            canvas.remove(activeObject);
+            canvas.add(img);
+            canvas.sendObjectToBack(img);
+            canvas.discardActiveObject();
+            canvas.renderAll();
+            updateLayers();
+            saveToHistory();
+            toast.success('Set as background');
+          });
+        }
+        break;
+        
+      case 'editText':
+        if (activeObject.type === 'textbox') {
+          activeObject.enterEditing();
+          activeObject.selectAll();
+          canvas.renderAll();
+          toast.success('Text editing mode activated');
+        }
+        break;
+        
+      case 'textColor':
+        if (activeObject.type === 'textbox') {
+          const colors = ['#ef4444', '#f97316', '#eab308', '#22c55e', '#3b82f6', '#8b5cf6', '#ec4899'];
+          const randomColor = colors[Math.floor(Math.random() * colors.length)];
+          activeObject.set('fill', randomColor);
+          canvas.renderAll();
+          saveToHistory();
+          toast.success('Text color changed');
+        }
+        break;
+        
+      case 'crop':
+        if (activeObject.type === 'image') {
+          setCropDialog({ open: true, imageObject: activeObject });
+          setContextMenu({ visible: false, x: 0, y: 0 });
+          toast.success('Crop mode activated');
+        }
+        break;
+        
+      default:
+        break;
+    }
+  };
+  
+  // Close context menu on click outside
+  useEffect(() => {
+    const handleClickOutside = () => {
+      setContextMenu({ visible: false, x: 0, y: 0 });
+    };
+    
+    if (contextMenu.visible) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [contextMenu.visible]);
+  
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      // Ignore if typing in input fields
+      if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' || e.target.isContentEditable) {
+        return;
+      }
+      
+      const isCtrl = e.ctrlKey || e.metaKey;
+      
+      switch (e.key) {
+        case 'Delete':
+        case 'Backspace':
+          if (activeObject && canvas) {
+            canvas.remove(activeObject);
+            canvas.renderAll();
+            updateLayers();
+            saveToHistory();
+            e.preventDefault();
+          }
+          break;
+          
+        case 'd':
+          if (isCtrl && activeObject && canvas) {
+            activeObject.clone().then((cloned) => {
+              cloned.set({
+                left: activeObject.left + 20,
+                top: activeObject.top + 20
+              });
+              canvas.add(cloned);
+              canvas.setActiveObject(cloned);
+              canvas.renderAll();
+              updateLayers();
+              saveToHistory();
+            });
+            e.preventDefault();
+          }
+          break;
+          
+        case 'z':
+          if (isCtrl && !e.shiftKey) {
+            undo();
+            e.preventDefault();
+          }
+          break;
+          
+        case 'y':
+          if (isCtrl) {
+            redo();
+            e.preventDefault();
+          }
+          break;
+          
+        case 'Z':
+          if (isCtrl && e.shiftKey) {
+            redo();
+            e.preventDefault();
+          }
+          break;
+          
+        case 'a':
+          if (isCtrl && canvas) {
+            canvas.discardActiveObject();
+            const selection = new fabric.ActiveSelection(canvas.getObjects(), {
+              canvas: canvas,
+            });
+            canvas.setActiveObject(selection);
+            canvas.requestRenderAll();
+            e.preventDefault();
+          }
+          break;
+          
+        case 'c':
+          if (isCtrl && activeObject) {
+            activeObject.clone().then((cloned) => {
+              window.clipboardObject = cloned;
+            });
+            e.preventDefault();
+          }
+          break;
+          
+        case 'v':
+          if (isCtrl && window.clipboardObject && canvas) {
+            window.clipboardObject.clone().then((cloned) => {
+              cloned.set({
+                left: cloned.left + 20,
+                top: cloned.top + 20
+              });
+              canvas.add(cloned);
+              canvas.setActiveObject(cloned);
+              canvas.renderAll();
+              updateLayers();
+              saveToHistory();
+            });
+            e.preventDefault();
+          }
+          break;
+          
+        case 'ArrowUp':
+          if (activeObject && canvas) {
+            activeObject.set('top', activeObject.top - (e.shiftKey ? 10 : 1));
+            canvas.renderAll();
+            saveToHistory();
+            e.preventDefault();
+          }
+          break;
+          
+        case 'ArrowDown':
+          if (activeObject && canvas) {
+            activeObject.set('top', activeObject.top + (e.shiftKey ? 10 : 1));
+            canvas.renderAll();
+            saveToHistory();
+            e.preventDefault();
+          }
+          break;
+          
+        case 'ArrowLeft':
+          if (activeObject && canvas) {
+            activeObject.set('left', activeObject.left - (e.shiftKey ? 10 : 1));
+            canvas.renderAll();
+            saveToHistory();
+            e.preventDefault();
+          }
+          break;
+          
+        case 'ArrowRight':
+          if (activeObject && canvas) {
+            activeObject.set('left', activeObject.left + (e.shiftKey ? 10 : 1));
+            canvas.renderAll();
+            saveToHistory();
+            e.preventDefault();
+          }
+          break;
+          
+        case 'Escape':
+          if (canvas) {
+            canvas.discardActiveObject();
+            canvas.renderAll();
+            setContextMenu({ visible: false, x: 0, y: 0 });
+          }
+          break;
+      }
+    };
+    
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [activeObject, canvas, updateLayers, saveToHistory, undo, redo]);
 
   return (
     <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-slate-100 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900 p-4 overflow-hidden" ref={containerRef}>
@@ -238,6 +578,20 @@ const Canvas = () => {
           </div>
         </div>
       </motion.div>
+      
+      <ContextMenu
+        isVisible={contextMenu.visible}
+        position={{ x: contextMenu.x, y: contextMenu.y }}
+        onClose={() => setContextMenu({ visible: false, x: 0, y: 0 })}
+        activeObject={activeObject}
+        onAction={handleContextMenuAction}
+      />
+      
+      <CropDialog
+        isOpen={cropDialog.open}
+        onClose={() => setCropDialog({ open: false, imageObject: null })}
+        imageObject={cropDialog.imageObject}
+      />
     </div>
   );
 };

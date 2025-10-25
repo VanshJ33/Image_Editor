@@ -7,9 +7,9 @@ import { Input } from '../ui/input';
 import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, Wand2, GripVertical, Group, Ungroup, CheckSquare, Square, ChevronDown, ChevronRight } from 'lucide-react';
+import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, Wand2, GripVertical, Group, Ungroup, CheckSquare, Square, ChevronDown, ChevronRight, Image as ImageIcon } from 'lucide-react';
 import { motion, Reorder } from 'framer-motion';
-import { toast } from '../ui/sonner';
+import { toast } from 'sonner';
 import { filters } from 'fabric';
 import * as fabric from 'fabric';
 import { allGoogleFonts, loadGoogleFont, searchFonts } from '../../utils/googleFonts';
@@ -155,6 +155,7 @@ const RightSidebar = () => {
   const [fontSearch, setFontSearch] = useState('');
   const [filteredFonts, setFilteredFonts] = useState(allGoogleFonts.slice(0, 100));
   const [maskText, setMaskText] = useState('TEXT');
+  const [recentColors, setRecentColors] = useState(['#000000']);
   const [properties, setProperties] = useState({
     fill: '#000000',
     stroke: '#000000',
@@ -172,7 +173,7 @@ const RightSidebar = () => {
 
   useEffect(() => {
     if (activeObject) {
-      setProperties({
+      const newProperties = {
         fill: activeObject.fill || '#000000',
         stroke: activeObject.stroke || '#000000',
         strokeWidth: activeObject.strokeWidth || 0,
@@ -185,16 +186,36 @@ const RightSidebar = () => {
         contrast: activeObject.contrast || 0,
         saturation: activeObject.saturation || 0,
         blur: activeObject.blur || 0
-      });
+      };
+      setProperties(newProperties);
+      
+      // If it's a text object, set the font search to the current font
+      if (activeObject.type === 'textbox' && activeObject.fontFamily) {
+        setFontSearch(activeObject.fontFamily);
+      } else {
+        setFontSearch('');
+      }
+    } else {
+      setFontSearch('');
     }
   }, [activeObject]);
 
   useEffect(() => {
-    const filtered = fontSearch ? 
-      searchFonts(fontSearch, allGoogleFonts).slice(0, 100) : 
-      allGoogleFonts.slice(0, 100);
+    let filtered;
+    if (fontSearch) {
+      filtered = searchFonts(fontSearch, allGoogleFonts).slice(0, 100);
+      // If the search matches the current font exactly, put it at the top
+      if (activeObject && activeObject.type === 'textbox' && activeObject.fontFamily) {
+        const currentFont = activeObject.fontFamily;
+        if (currentFont.toLowerCase().includes(fontSearch.toLowerCase())) {
+          filtered = [currentFont, ...filtered.filter(font => font !== currentFont)];
+        }
+      }
+    } else {
+      filtered = allGoogleFonts.slice(0, 100);
+    }
     setFilteredFonts(filtered);
-  }, [fontSearch]);
+  }, [fontSearch, activeObject]);
 
   const updateProperty = async (key, value) => {
     if (activeObject && canvas) {
@@ -211,6 +232,12 @@ const RightSidebar = () => {
       } else {
         activeObject.set(key, value);
       }
+      
+      // Update recent colors when fill or stroke color is changed
+      if ((key === 'fill' || key === 'stroke') && typeof value === 'string' && value.startsWith('#')) {
+        setRecentColors([value]);
+      }
+      
       canvas.renderAll();
       setProperties(prev => ({ ...prev, [key]: value }));
       saveToHistory();
@@ -404,27 +431,15 @@ const RightSidebar = () => {
 
 const setAsBackground = () => {
     if (activeObject && activeObject.type === 'image' && canvas) {
-
-      const objects = canvas.getObjects();
-      const existingBg = objects.find(obj => obj.isBackgroundImage);
-      if (existingBg) {
-        canvas.remove(existingBg);
-      }
-      
-     
       const imgElement = activeObject.getElement();
       
-   
       fabric.FabricImage.fromURL(imgElement.src, { crossOrigin: 'anonymous' }).then((img) => {
- 
         const canvasWidth = canvas.width || 1080;
         const canvasHeight = canvas.height || 1080;
         
-
         const actualCanvasWidth = canvasWidth / (canvas.getZoom() || 1);
         const actualCanvasHeight = canvasHeight / (canvas.getZoom() || 1);
         
-     
         const imgWidth = img.width;
         const imgHeight = img.height;
         
@@ -432,20 +447,14 @@ const setAsBackground = () => {
         const scaleY = actualCanvasHeight / imgHeight;
         const scale = Math.max(scaleX, scaleY);
         
-        // Calculate the scaled dimensions
-        const scaledWidth = imgWidth * scale;
-        const scaledHeight = imgHeight * scale;
-        
         // Calculate position to center the image
-        const left = (actualCanvasWidth - scaledWidth) / 2;
-        const top = (actualCanvasHeight - scaledHeight) / 2;
+        const left = (actualCanvasWidth - (imgWidth * scale)) / 2;
+        const top = (actualCanvasHeight - (imgHeight * scale)) / 2;
         
         // Set image properties for background
         img.set({
           left: left,
           top: top,
-          originX: 'left',
-          originY: 'top',
           scaleX: scale,
           scaleY: scale,
           selectable: false,
@@ -454,24 +463,23 @@ const setAsBackground = () => {
           objectCaching: false
         });
         
-        // Remove the old active object
+        // Remove existing background if any
+        const existingBg = canvas.getObjects().find(obj => obj.isBackgroundImage);
+        if (existingBg) {
+          canvas.remove(existingBg);
+        }
+        
+        // Remove the original active object
         canvas.remove(activeObject);
         
-        // Get all remaining objects
-        const remainingObjects = canvas.getObjects();
-        
-        // Clear canvas and add background first
-        canvas.clear();
+      
         canvas.add(img);
-        
-        // Add all other objects on top
-        remainingObjects.forEach(obj => canvas.add(obj));
+        canvas.sendObjectToBack(img);
         
         canvas.discardActiveObject();
         canvas.renderAll();
         updateLayers();
         saveToHistory();
-
       });
     }
   };
@@ -507,6 +515,8 @@ const setAsBackground = () => {
                     Delete
                   </Button>
                 </div>
+
+
 
                 {activeObject.type === 'textbox' && (
                   <>
@@ -617,6 +627,93 @@ const setAsBackground = () => {
                         </Button>
                       </div>
                     </div>
+
+                    <div className="space-y-2">
+                      <Label>Text Effects</Label>
+                      <Select onValueChange={(effect) => {
+                        if (effect === 'none') {
+                          updateProperty('fill', '#000000');
+                          updateProperty('stroke', 'transparent');
+                          updateProperty('strokeWidth', 0);
+                          activeObject.set('shadow', null);
+                          activeObject.set('backgroundColor', '');
+                        } else if (effect === 'drop-shadow') {
+                          activeObject.set('shadow', new fabric.Shadow({
+                            color: 'rgba(0,0,0,0.3)',
+                            blur: 5,
+                            offsetX: 2,
+                            offsetY: 2
+                          }));
+                        } else if (effect === 'glow') {
+                          activeObject.set('shadow', new fabric.Shadow({
+                            color: 'rgba(0,0,0,0.5)',
+                            blur: 10,
+                            offsetX: 0,
+                            offsetY: 0
+                          }));
+                        } else if (effect === 'outline') {
+                          updateProperty('stroke', '#000000');
+                          updateProperty('strokeWidth', 2);
+                        } else if (effect === 'sunset-gradient') {
+                          const gradient = new fabric.Gradient({
+                            type: 'linear',
+                            coords: { x1: 0, y1: 0, x2: activeObject.width, y2: 0 },
+                            colorStops: [
+                              { offset: 0, color: '#ff6b6b' },
+                              { offset: 1, color: '#4ecdc4' }
+                            ]
+                          });
+                          updateProperty('fill', gradient);
+                        } else if (effect === 'neon') {
+                          updateProperty('fill', '#ff6b6b');
+                          activeObject.set('shadow', new fabric.Shadow({
+                            color: 'rgba(255,107,107,0.4)',
+                            blur: 8,
+                            offsetX: 0,
+                            offsetY: 0
+                          }));
+                        } else if (effect === 'gold') {
+                          updateProperty('fill', '#ffd700');
+                          activeObject.set('shadow', new fabric.Shadow({
+                            color: 'rgba(255,215,0,0.8)',
+                            blur: 12,
+                            offsetX: 3,
+                            offsetY: 3
+                          }));
+                          updateProperty('stroke', '#b8860b');
+                          updateProperty('strokeWidth', 2);
+                        } else if (effect === '80s-retro') {
+                          const gradient = new fabric.Gradient({
+                            type: 'linear',
+                            coords: { x1: 0, y1: 0, x2: 0, y2: activeObject.height },
+                            colorStops: [
+                              { offset: 0, color: '#ff6b9d' },
+                              { offset: 0.5, color: '#c44569' },
+                              { offset: 1, color: '#f8b500' }
+                            ]
+                          });
+                          updateProperty('fill', gradient);
+                          updateProperty('stroke', '#2c2c54');
+                          updateProperty('strokeWidth', 3);
+                        }
+                        canvas.renderAll();
+                        saveToHistory();
+                      }}>
+                        <SelectTrigger>
+                          <SelectValue placeholder="Choose effect" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="none">None</SelectItem>
+                          <SelectItem value="drop-shadow">Drop Shadow</SelectItem>
+                          <SelectItem value="glow">Glow</SelectItem>
+                          <SelectItem value="outline">Outline</SelectItem>
+                          <SelectItem value="sunset-gradient">Sunset Gradient</SelectItem>
+                          <SelectItem value="neon">Neon</SelectItem>
+                          <SelectItem value="gold">Gold</SelectItem>
+                          <SelectItem value="80s-retro">80s Retro</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </>
                 )}
 
@@ -636,6 +733,22 @@ const setAsBackground = () => {
                       className="flex-1"
                     />
                   </div>
+                  <div className="space-y-2">
+                    <div className="text-xs text-slate-500">Recent Color</div>
+                    <div className="grid grid-cols-1 gap-1 w-8">
+                      {recentColors.map((color, index) => (
+                        <button
+                          key={index}
+                          onClick={() => updateProperty('fill', color)}
+                          className={`w-6 h-6 rounded border-2 transition-all hover:scale-110 ${
+                            properties.fill === color ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-300'
+                          }`}
+                          style={{ backgroundColor: color }}
+                          title={color}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 </div>
 
                 {activeObject.type !== 'textbox' && (
@@ -654,6 +767,22 @@ const setAsBackground = () => {
                         onChange={(e) => updateProperty('stroke', e.target.value)}
                         className="flex-1"
                       />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="text-xs text-slate-500">Recent Color</div>
+                      <div className="grid grid-cols-1 gap-1 w-8">
+                        {recentColors.map((color, index) => (
+                          <button
+                            key={index}
+                            onClick={() => updateProperty('stroke', color)}
+                            className={`w-6 h-6 rounded border-2 transition-all hover:scale-110 ${
+                              properties.stroke === color ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-300'
+                            }`}
+                            style={{ backgroundColor: color }}
+                            title={color}
+                          />
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -706,6 +835,68 @@ const setAsBackground = () => {
                       <div className="space-y-2">
                         <Label>Image Actions</Label>
                         <div className="space-y-2">
+                          {activeObject.isTemplateImage && (
+                            <div className="space-y-2">
+                              <label htmlFor="replace-template-image" className="block">
+                                <Button 
+                                  variant="outline" 
+                                  className="w-full gap-2 bg-gradient-to-r from-indigo-500 to-purple-500 text-white hover:from-indigo-600 hover:to-purple-600 border-0"
+                                  asChild
+                                >
+                                  <div className="cursor-pointer">
+                                    <ImageIcon className="w-4 h-4" />
+                                    Replace Template Image
+                                  </div>
+                                </Button>
+                                <input
+                                  id="replace-template-image"
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={(e) => {
+                                    const file = e.target.files[0];
+                                    if (file && canvas && activeObject) {
+                                      const reader = new FileReader();
+                                      reader.onload = (event) => {
+                                        fabric.FabricImage.fromURL(event.target.result, { crossOrigin: 'anonymous' }).then((img) => {
+                                          // Calculate the current template image's display dimensions
+                                          const templateWidth = activeObject.width * activeObject.scaleX;
+                                          const templateHeight = activeObject.height * activeObject.scaleY;
+                                          
+                                          // Calculate scale to fit new image within template bounds
+                                          const scaleX = templateWidth / img.width;
+                                          const scaleY = templateHeight / img.height;
+                                          const scale = Math.min(scaleX, scaleY); // Use min to ensure it fits within bounds
+                                          
+                                          // Set the new image properties to match template position and fit within bounds
+                                          img.set({
+                                            left: activeObject.left,
+                                            top: activeObject.top,
+                                            scaleX: scale,
+                                            scaleY: scale,
+                                            angle: activeObject.angle,
+                                            opacity: activeObject.opacity,
+                                            name: activeObject.name,
+                                            isTemplateImage: true
+                                          });
+                                          
+                                          // Replace the old image
+                                          canvas.remove(activeObject);
+                                          canvas.add(img);
+                                          canvas.setActiveObject(img);
+                                          canvas.renderAll();
+                                          updateLayers();
+                                          saveToHistory();
+                                          toast.success('Template image replaced successfully!');
+                                        });
+                                      };
+                                      reader.readAsDataURL(file);
+                                    }
+                                  }}
+                                />
+                              </label>
+                            </div>
+                          )}
                           <Button 
                             onClick={() => setAsBackground()}
                             variant="outline" 

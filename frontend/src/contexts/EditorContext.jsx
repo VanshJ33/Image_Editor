@@ -19,7 +19,7 @@ export const EditorProvider = ({ children }) => {
   const [canvasSize, setCanvasSize] = useState({ width: 1080, height: 1080 });
   const [backgroundColor, setBackgroundColor] = useState('#ffffff');
   const [history, setHistory] = useState([]);
-  const [historyStep, setHistoryStep] = useState(0);
+  const [historyStep, setHistoryStep] = useState(-1);
   const [layers, setLayers] = useState([]);
   const [selectedLayers, setSelectedLayers] = useState([]);
   const [expandedGroups, setExpandedGroups] = useState(new Set());
@@ -39,6 +39,18 @@ export const EditorProvider = ({ children }) => {
   const [canvasRotation, setCanvasRotation] = useState(0);
   const canvasRef = useRef(null);
   const boardDataRef = useRef({});
+  const isInitialized = useRef(false);
+
+  // Initialize history when canvas is first set
+  useEffect(() => {
+    if (canvas && !isInitialized.current) {
+      // Save initial empty canvas state
+      const initialState = canvas.toJSON();
+      setHistory([initialState]);
+      setHistoryStep(0);
+      isInitialized.current = true;
+    }
+  }, [canvas]);
 
   const updateLayers = useCallback(() => {
     if (canvas) {
@@ -85,7 +97,9 @@ export const EditorProvider = ({ children }) => {
       const json = canvas.toJSON();
       setHistory(prev => {
         const newHistory = prev.slice(0, historyStep + 1);
-        return [...newHistory, json];
+        const updatedHistory = [...newHistory, json];
+        // Limit history to prevent memory issues
+        return updatedHistory.slice(-50);
       });
       setHistoryStep(prev => prev + 1);
     }
@@ -96,22 +110,33 @@ export const EditorProvider = ({ children }) => {
       const prevState = history[historyStep - 1];
       canvas.loadFromJSON(prevState, () => {
         canvas.renderAll();
+        canvas.requestRenderAll();
         setHistoryStep(prev => prev - 1);
         updateLayers();
+        // Update active object after undo
+        const activeObj = canvas.getActiveObject();
+        setActiveObject(activeObj);
       });
     }
-  }, [canvas, history, historyStep, updateLayers]);
+  }, [canvas, history, historyStep, updateLayers, setActiveObject]);
 
   const redo = useCallback(() => {
-    if (historyStep < history.length - 1 && canvas && history[historyStep + 1]) {
-      const nextState = history[historyStep + 1];
-      canvas.loadFromJSON(nextState, () => {
-        canvas.renderAll();
-        setHistoryStep(prev => prev + 1);
-        updateLayers();
-      });
+    if (historyStep < history.length - 1 && canvas) {
+      const nextStep = historyStep + 1;
+      const nextState = history[nextStep];
+      if (nextState) {
+        canvas.loadFromJSON(nextState, () => {
+          canvas.renderAll();
+          canvas.requestRenderAll();
+          setHistoryStep(nextStep);
+          updateLayers();
+          // Update active object after redo
+          const activeObj = canvas.getActiveObject();
+          setActiveObject(activeObj);
+        });
+      }
     }
-  }, [canvas, history, historyStep, updateLayers]);
+  }, [canvas, history, historyStep, updateLayers, setActiveObject]);
 
   const copyObject = useCallback(() => {
     if (activeObject) {
@@ -653,6 +678,24 @@ const groupSelectedLayers = useCallback(() => {
     saveToHistory();
 
   }, [canvas, activeObject, updateLayers, saveToHistory]);
+
+  // Add keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key === 'z' && !e.shiftKey) {
+          e.preventDefault();
+          undo();
+        } else if ((e.key === 'y') || (e.key === 'z' && e.shiftKey)) {
+          e.preventDefault();
+          redo();
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [undo, redo]);
 
 
 

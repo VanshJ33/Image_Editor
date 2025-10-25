@@ -16,8 +16,7 @@ const ElementsPanel = () => {
 
   // ✅ Use your API key here
   const apiKey = 'X4eTCMg7rLGxEVw0r3lIaBrxuVfhGrGGZblYCdqQWZP9zx4xTsIWSwQTU67tnhqa';
-  const proxyUrl = 'https://api.allorigins.win/raw?url='; // ✅ Reliable CORS proxy
-
+  const proxyUrl = 'https://api.allorigins.win/raw?url='; 
   const categories = [
     { id: 'all', name: 'All', icon: '✨' },
     { id: 'shapes', name: 'Shapes', icon: '⬛' },
