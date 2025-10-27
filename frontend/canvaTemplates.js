@@ -3402,7 +3402,7 @@ export const canvaTemplates = [
   {
     "title": "3D Text Effect",
     "category": "Text Effects",
-    "filename": "3d_text_effect_v2.json",
+    "filename": "3d_text_effect.json",
     "json": {
       "version": "5.3.0",
       "objects": [

@@ -9,7 +9,7 @@ import * as fabric from 'fabric';
 import { ActiveSelection } from 'fabric';
 
 const Canvas = () => {
-  const { canvas, setCanvas, canvasRef, setActiveObject, saveToHistory, updateLayers, canvasSize, zoom, setZoom, backgroundColor, showGrid, canvasRotation, activeObject, undo, redo } = useEditor();
+  const { canvas, setCanvas, canvasRef, setActiveObject, saveToHistory, updateLayers, canvasSize, zoom, setZoom, backgroundColor, showGrid, canvasRotation, activeObject, undo, redo, isDrawingCustom, setIsDrawingCustom, customPath, setCustomPath, fillShapeWithImage } = useEditor();
   const containerRef = useRef(null);
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
   const [cropDialog, setCropDialog] = useState({ open: false, imageObject: null });
@@ -99,6 +99,9 @@ const Canvas = () => {
       fabricCanvas.on('object:modified', debouncedSave);
       fabricCanvas.on('object:added', () => updateLayers());
       fabricCanvas.on('object:removed', () => updateLayers());
+      
+      // Allow free movement - only prevent objects from completely disappearing
+      // No constraints on object movement - users can move objects freely
       
       // Right-click context menu
       const handleContextMenu = (e) => {
@@ -190,6 +193,84 @@ const Canvas = () => {
       canvas.renderAll();
     }
   }, [backgroundColor, canvas]);
+
+  // Handle custom shape drawing
+  useEffect(() => {
+    if (!canvas || !isDrawingCustom) return;
+
+    const handleMouseDown = (e) => {
+      if (!isDrawingCustom) return;
+      
+      const pointer = canvas.getPointer(e.e);
+      const newPath = [...customPath, { x: pointer.x, y: pointer.y }];
+      setCustomPath(newPath);
+      
+      // Add visual indicator for the point
+      const point = new fabric.Circle({
+        left: pointer.x,
+        top: pointer.y,
+        radius: 5,
+        fill: '#4f46e5',
+        stroke: '#ffffff',
+        strokeWidth: 2,
+        originX: 'center',
+        originY: 'center',
+        selectable: false,
+        evented: false,
+        name: 'customShapePoint'
+      });
+      
+      canvas.add(point);
+      
+      // Draw connecting line if there are multiple points
+      if (newPath.length > 1) {
+        const prevPoint = newPath[newPath.length - 2];
+        const line = new fabric.Line([prevPoint.x, prevPoint.y, pointer.x, pointer.y], {
+          stroke: '#4f46e5',
+          strokeWidth: 2,
+          strokeDashArray: [5, 5],
+          selectable: false,
+          evented: false,
+          name: 'customShapeLine'
+        });
+        canvas.add(line);
+      }
+      
+      canvas.renderAll();
+    };
+
+    const handleRightClick = (e) => {
+      e.preventDefault();
+      if (!isDrawingCustom) return;
+      
+      // Finish custom shape
+      if (customPath.length >= 3) {
+        setIsDrawingCustom(false);
+        toast.success('Custom shape finished. Click "Finish" to create.');
+      } else {
+        toast.error('Need at least 3 points to create a shape');
+      }
+    };
+
+    canvas.on('mouse:down', handleMouseDown);
+    canvas.wrapperEl.addEventListener('contextmenu', handleRightClick);
+
+    return () => {
+      canvas.off('mouse:down', handleMouseDown);
+      canvas.wrapperEl?.removeEventListener('contextmenu', handleRightClick);
+      
+      // Clear visual indicators when exiting drawing mode
+      if (!isDrawingCustom) {
+        const objects = canvas.getObjects();
+        objects.forEach(obj => {
+          if (obj.name === 'customShapePoint' || obj.name === 'customShapeLine') {
+            canvas.remove(obj);
+          }
+        });
+        canvas.renderAll();
+      }
+    };
+  }, [canvas, isDrawingCustom, customPath]);
 
   useEffect(() => {
     if (canvas && showGrid) {
@@ -381,6 +462,10 @@ const Canvas = () => {
           setContextMenu({ visible: false, x: 0, y: 0 });
           toast.success('Crop mode activated');
         }
+        break;
+        
+      case 'fillWithImage':
+        fillShapeWithImage();
         break;
         
       default:

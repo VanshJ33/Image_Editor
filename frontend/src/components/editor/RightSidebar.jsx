@@ -7,7 +7,7 @@ import { Input } from '../ui/input';
 import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, Wand2, GripVertical, Group, Ungroup, CheckSquare, Square, ChevronDown, ChevronRight, Image as ImageIcon } from 'lucide-react';
+import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, Wand2, GripVertical, Group, Ungroup, CheckSquare, Square, ChevronDown, ChevronRight, Image as ImageIcon, Paintbrush } from 'lucide-react';
 import { motion, Reorder } from 'framer-motion';
 import { toast } from 'sonner';
 import { filters } from 'fabric';
@@ -150,7 +150,8 @@ const RightSidebar = () => {
     ungroupLayer,
     maskWithShape,
     maskWithText,
-    removeMask
+    removeMask,
+    maskImageWithCustomShape
   } = useEditor();
   const [fontSearch, setFontSearch] = useState('');
   const [filteredFonts, setFilteredFonts] = useState(allGoogleFonts.slice(0, 100));
@@ -282,93 +283,26 @@ const RightSidebar = () => {
 
   const duplicateObject = () => {
     if (activeObject && canvas) {
-      const objData = {
-        left: activeObject.left + 20,
-        top: activeObject.top + 20,
-        width: activeObject.width,
-        height: activeObject.height,
-        fill: activeObject.fill,
-        stroke: activeObject.stroke,
-        strokeWidth: activeObject.strokeWidth,
-        opacity: activeObject.opacity,
-        angle: activeObject.angle,
-        scaleX: activeObject.scaleX,
-        scaleY: activeObject.scaleY
-      };
-      
-      let newObj;
-      if (activeObject.type === 'textbox') {
-        newObj = new fabric.Textbox(activeObject.text, {
-          left: activeObject.left + 20,
-          top: activeObject.top + 20,
-          width: activeObject.width,
-          fontSize: activeObject.fontSize,
-          fontFamily: activeObject.fontFamily,
-          fontWeight: activeObject.fontWeight,
-          textAlign: activeObject.textAlign,
-          fill: activeObject.fill
-        });
-      } else if (activeObject.type === 'rect') {
-        newObj = new fabric.Rect(objData);
-      } else if (activeObject.type === 'circle') {
-        newObj = new fabric.Circle({ 
-          left: activeObject.left + 20,
-          top: activeObject.top + 20,
-          radius: activeObject.radius,
-          fill: activeObject.fill
-        });
-      } else if (activeObject.type === 'triangle') {
-        newObj = new fabric.Triangle(objData);
-      } else if (activeObject.type === 'ellipse') {
-        newObj = new fabric.Ellipse({ 
-          left: activeObject.left + 20,
-          top: activeObject.top + 20,
-          rx: activeObject.rx, 
-          ry: activeObject.ry,
-          fill: activeObject.fill
-        });
-      } else if (activeObject.type === 'polygon') {
-        newObj = new fabric.Polygon(activeObject.points, {
-          left: activeObject.left + 20,
-          top: activeObject.top + 20,
-          fill: activeObject.fill
-        });
-      } else if (activeObject.type === 'text') {
-        newObj = new fabric.Text(activeObject.text, {
-          left: activeObject.left + 20,
-          top: activeObject.top + 20,
-          fontSize: activeObject.fontSize,
-          fontFamily: activeObject.fontFamily,
-          fill: activeObject.fill
-        });
-      } else if (activeObject.type === 'image') {
-        const imgElement = activeObject.getElement();
-        fabric.FabricImage.fromURL(imgElement.src, { crossOrigin: 'anonymous' }).then((img) => {
-          img.set({
-            left: activeObject.left + 20,
-            top: activeObject.top + 20,
-            scaleX: activeObject.scaleX,
-            scaleY: activeObject.scaleY,
-            angle: activeObject.angle,
-            opacity: activeObject.opacity
+      try {
+        // Create a simplified copy using toObject and fromObject
+        const objectData = activeObject.toObject();
+        
+        // Create new object from the data
+        fabric.util.enlivenObjects([objectData], (objects) => {
+          const cloned = objects[0];
+          cloned.set({
+            left: cloned.left + 20,
+            top: cloned.top + 20,
           });
-          canvas.add(img);
-          canvas.setActiveObject(img);
+          canvas.add(cloned);
+          canvas.setActiveObject(cloned);
           canvas.renderAll();
           updateLayers();
           saveToHistory();
-
         });
-        return;
-      }
-      
-      if (newObj) {
-        canvas.add(newObj);
-        canvas.setActiveObject(newObj);
-        canvas.renderAll();
-        updateLayers();
-        saveToHistory();
-
+      } catch (error) {
+        console.error('Duplicate failed:', error);
+        toast.error('Failed to duplicate object');
       }
     }
   };
@@ -483,6 +417,23 @@ const setAsBackground = () => {
       });
     }
   };
+
+  const makeBackgroundEditable = () => {
+    if (canvas) {
+      const backgroundImg = canvas.getObjects().find(obj => obj.isBackgroundImage);
+      if (backgroundImg) {
+        backgroundImg.set({
+          selectable: true,
+          evented: true,
+          isBackgroundImage: false
+        });
+        canvas.setActiveObject(backgroundImg);
+        canvas.renderAll();
+        updateLayers();
+        saveToHistory();
+      }
+    }
+  };
   return (
     <motion.div
       initial={{ x: 20, opacity: 0 }}
@@ -503,6 +454,17 @@ const setAsBackground = () => {
 
         <ScrollArea className="flex-1 px-4 pb-6 overflow-y-auto">
           <TabsContent value="properties" className="mt-0 space-y-6">
+            {canvas && canvas.getObjects().find(obj => obj.isBackgroundImage) && (
+              <div className="p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800">
+                <Button 
+                  onClick={() => makeBackgroundEditable()}
+                  variant="outline" 
+                  className="w-full gap-2"
+                >
+                  Make Background Editable
+                </Button>
+              </div>
+            )}
             {activeObject ? (
               <>
                 <div className="flex gap-2">
@@ -904,48 +866,18 @@ const setAsBackground = () => {
                           >
                             Set as Background
                           </Button>
-                          <div className="space-y-2">
-                            <Label>Mask with Shape</Label>
-                            <div className="flex gap-2">
-                              <Button 
-                                onClick={() => maskWithShape && maskWithShape('circle')}
-                                variant="outline" 
-                                className="flex-1"
-                              >
-                                Circle
-                              </Button>
-                              <Button 
-                                onClick={() => maskWithShape && maskWithShape('rectangle')}
-                                variant="outline" 
-                                className="flex-1"
-                              >
-                                Rectangle
-                              </Button>
-                            </div>
-                            <Label>Mask with Text</Label>
-                            <div className="flex gap-2">
-                              <Input
-                                type="text"
-                                value={maskText}
-                                onChange={(e) => setMaskText(e.target.value)}
-                                placeholder="Enter text"
-                                className="flex-1"
-                              />
-                              <Button 
-                                onClick={() => maskWithText && maskWithText(maskText)}
-                                variant="outline"
-                              >
-                                Apply
-                              </Button>
-                            </div>
-                            <Button 
-                              onClick={() => removeMask && removeMask()}
-                              variant="outline" 
-                              className="w-full"
-                            >
-                              Remove Mask
-                            </Button>
-                          </div>
+
+                          {canvas && canvas.getObjects().find(obj => obj.isBackgroundImage) && (
+  <Button 
+    onClick={() => makeBackgroundEditable()}
+    variant="outline" 
+    className="w-full gap-2"
+  >
+    Make Background Editable
+  </Button>
+)}
+
+
                         </div>
                       </div>
                       

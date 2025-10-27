@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Group, Rect, Circle, Text, FabricImage } from 'fabric';
+import * as fabric from 'fabric';
 
 const EditorContext = createContext(null);
 
@@ -40,6 +41,8 @@ export const EditorProvider = ({ children }) => {
   const canvasRef = useRef(null);
   const boardDataRef = useRef({});
   const isInitialized = useRef(false);
+  const [isDrawingCustom, setIsDrawingCustom] = useState(false);
+  const [customPath, setCustomPath] = useState([]);
 
   // Initialize history when canvas is first set
   useEffect(() => {
@@ -146,16 +149,23 @@ export const EditorProvider = ({ children }) => {
 
   const pasteObject = useCallback(() => {
     if (clipboardObject && canvas) {
-      clipboardObject.clone((cloned) => {
-        cloned.set({
-          left: cloned.left + 20,
-          top: cloned.top + 20,
+      try {
+        const objectData = clipboardObject.toObject();
+        fabric.util.enlivenObjects([objectData], (objects) => {
+          const cloned = objects[0];
+          cloned.set({
+            left: cloned.left + 20,
+            top: cloned.top + 20,
+          });
+          canvas.add(cloned);
+          canvas.setActiveObject(cloned);
+          canvas.renderAll();
+          saveToHistory();
         });
-        canvas.add(cloned);
-        canvas.setActiveObject(cloned);
-        canvas.renderAll();
-        saveToHistory();
-      });
+      } catch (error) {
+        console.error('Paste failed:', error);
+        toast.error('Failed to paste object');
+      }
     }
   }, [clipboardObject, canvas, saveToHistory]);
 
@@ -194,16 +204,23 @@ export const EditorProvider = ({ children }) => {
   
   const duplicateObject = useCallback(() => {
     if (activeObject && canvas) {
-      activeObject.clone((cloned) => {
-        cloned.set({
-          left: cloned.left + 20,
-          top: cloned.top + 20,
+      try {
+        const objectData = activeObject.toObject();
+        fabric.util.enlivenObjects([objectData], (objects) => {
+          const cloned = objects[0];
+          cloned.set({
+            left: cloned.left + 20,
+            top: cloned.top + 20,
+          });
+          canvas.add(cloned);
+          canvas.setActiveObject(cloned);
+          canvas.renderAll();
+          saveToHistory();
         });
-        canvas.add(cloned);
-        canvas.setActiveObject(cloned);
-        canvas.renderAll();
-        saveToHistory();
-      });
+      } catch (error) {
+        console.error('Duplicate failed:', error);
+        toast.error('Failed to duplicate object');
+      }
     }
   }, [activeObject, canvas, saveToHistory]);
   
@@ -592,16 +609,47 @@ const groupSelectedLayers = useCallback(() => {
     const ctx = tempCanvas.getContext('2d');
     
     const size = Math.min(activeObject.width * activeObject.scaleX, activeObject.height * activeObject.scaleY);
+    const getStrokeWidth = (size) => Math.max(1, Math.min(8, size / 25));
+    const strokeWidth = getStrokeWidth(size);
+    
     tempCanvas.width = size;
     tempCanvas.height = size;
     
     if (shape === 'circle') {
+      // Save the state before clipping
+      ctx.save();
+      
+      // Draw the image with circular clipping
       ctx.beginPath();
       ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
       ctx.clip();
+      ctx.drawImage(imgElement, 0, 0, size, size);
+      
+      // Reset clipping and draw the circular stroke on top
+      ctx.restore();
+      ctx.beginPath();
+      ctx.arc(size/2, size/2, size/2 - strokeWidth/2, 0, Math.PI * 2);
+      ctx.strokeStyle = '#0891b2';
+      ctx.lineWidth = strokeWidth;
+      ctx.stroke();
+    } else if (shape === 'rectangle') {
+      // Save the state before clipping
+      ctx.save();
+      
+      // Draw the image with rectangular clipping
+      ctx.beginPath();
+      ctx.rect(0, 0, size, size);
+      ctx.clip();
+      ctx.drawImage(imgElement, 0, 0, size, size);
+      
+      // Reset clipping and draw the rectangular stroke
+      ctx.restore();
+      ctx.beginPath();
+      ctx.rect(strokeWidth/2, strokeWidth/2, size - strokeWidth, size - strokeWidth);
+      ctx.strokeStyle = '#3730a3';
+      ctx.lineWidth = strokeWidth;
+      ctx.stroke();
     }
-    
-    ctx.drawImage(imgElement, 0, 0, size, size);
     
     const dataURL = tempCanvas.toDataURL();
     const img = new Image();
@@ -623,6 +671,95 @@ const groupSelectedLayers = useCallback(() => {
 
     };
     img.src = dataURL;
+  }, [canvas, activeObject, updateLayers, saveToHistory]);
+
+  const maskImageWithCustomShape = useCallback(() => {
+    if (!canvas || !activeObject || activeObject.type !== 'image') {
+      toast.error('Please select an image to mask');
+      return;
+    }
+
+    // Get all objects on canvas
+    const objects = canvas.getObjects();
+    let shapeToUse = null;
+    
+    // Look for any selectable shape object (not the active image, not visual indicators, not grid lines)
+    for (let i = objects.length - 1; i >= 0; i--) {
+      const obj = objects[i];
+      
+      // Skip if it's the active image or visual indicators
+      if (obj === activeObject || 
+          obj.id === 'grid-line' || 
+          obj.name === 'customShapePoint' || 
+          obj.name === 'customShapeLine') {
+        continue;
+      }
+      
+      // Check if it's a valid shape to use for masking
+      const validTypes = ['path', 'rect', 'circle', 'ellipse', 'triangle', 'polygon'];
+      
+      if (validTypes.includes(obj.type) || obj.selectable) {
+        shapeToUse = obj;
+        break;
+      }
+    }
+
+    if (!shapeToUse) {
+      toast.error('Please create a shape first (circle, rectangle, custom shape, etc.). Then select the image and click "Mask with Shape".');
+      return;
+    }
+
+    try {
+      // Create a new shape object directly instead of cloning
+      let clipShape;
+      
+      if (shapeToUse.type === 'rect') {
+        clipShape = new Rect({
+          left: 0,
+          top: 0,
+          width: shapeToUse.width * shapeToUse.scaleX,
+          height: shapeToUse.height * shapeToUse.scaleY,
+          originX: 'left',
+          originY: 'top'
+        });
+      } else if (shapeToUse.type === 'circle') {
+        clipShape = new Circle({
+          left: 0,
+          top: 0,
+          radius: shapeToUse.radius,
+          scaleX: shapeToUse.scaleX,
+          scaleY: shapeToUse.scaleY,
+          originX: 'left',
+          originY: 'top'
+        });
+      } else {
+        // For other shapes, use a simple rect as fallback
+        clipShape = new Rect({
+          left: 0,
+          top: 0,
+          width: (shapeToUse.width || 100) * (shapeToUse.scaleX || 1),
+          height: (shapeToUse.height || 100) * (shapeToUse.scaleY || 1),
+          originX: 'left',
+          originY: 'top'
+        });
+      }
+      
+      // Remove the original shape from canvas
+      canvas.remove(shapeToUse);
+      
+      // Apply as clipPath
+      activeObject.clipPath = clipShape;
+      activeObject.dirty = true;
+      
+      canvas.renderAll();
+      updateLayers();
+      saveToHistory();
+      toast.success(`Image masked with ${shapeToUse.type} shape!`);
+      
+    } catch (error) {
+      console.error('Masking error:', error);
+      toast.error('Failed to apply mask. Please try again.');
+    }
   }, [canvas, activeObject, updateLayers, saveToHistory]);
 
   const maskWithText = useCallback((text) => {
@@ -677,6 +814,126 @@ const groupSelectedLayers = useCallback(() => {
     updateLayers();
     saveToHistory();
 
+  }, [canvas, activeObject, updateLayers, saveToHistory]);
+
+  const fillShapeWithImage = useCallback(() => {
+    if (!canvas || !activeObject || activeObject.type !== 'image') {
+      toast.error('Please select an image first');
+      return;
+    }
+    
+    const objects = canvas.getObjects();
+    const validShapeTypes = ['rect', 'circle', 'triangle', 'ellipse', 'polygon', 'path', 'text', 'textbox'];
+    const shapes = objects.filter(obj => 
+      validShapeTypes.includes(obj.type) && 
+      obj !== activeObject && 
+      obj.type !== 'image' &&
+      obj.id !== 'grid-line' &&
+      obj.name !== 'customShapePoint' &&
+      obj.name !== 'customShapeLine'
+    );
+    
+    if (shapes.length === 0) {
+      toast.error('Please add a shape to the canvas to fill it');
+      return;
+    }
+    
+    let shapeToFill = null;
+    
+    // If only one shape, use it
+    if (shapes.length === 1) {
+      shapeToFill = shapes[0];
+    } else {
+      // Find the shape with maximum overlap or closest to the image
+      const imageBounds = activeObject.getBoundingRect();
+      let maxOverlap = 0;
+      let closestDistance = Infinity;
+      
+      for (const shape of shapes) {
+        const shapeBounds = shape.getBoundingRect();
+        
+        // Calculate overlap area
+        const overlapLeft = Math.max(imageBounds.left, shapeBounds.left);
+        const overlapTop = Math.max(imageBounds.top, shapeBounds.top);
+        const overlapRight = Math.min(imageBounds.left + imageBounds.width, shapeBounds.left + shapeBounds.width);
+        const overlapBottom = Math.min(imageBounds.top + imageBounds.height, shapeBounds.top + shapeBounds.height);
+        
+        const overlapArea = Math.max(0, overlapRight - overlapLeft) * Math.max(0, overlapBottom - overlapTop);
+        
+        // Calculate distance between centers
+        const imageCenterX = imageBounds.left + imageBounds.width / 2;
+        const imageCenterY = imageBounds.top + imageBounds.height / 2;
+        const shapeCenterX = shapeBounds.left + shapeBounds.width / 2;
+        const shapeCenterY = shapeBounds.top + shapeBounds.height / 2;
+        const distance = Math.sqrt(Math.pow(imageCenterX - shapeCenterX, 2) + Math.pow(imageCenterY - shapeCenterY, 2));
+        
+        // Prioritize shapes with overlap, then by proximity
+        if (overlapArea > maxOverlap || (overlapArea === maxOverlap && distance < closestDistance)) {
+          maxOverlap = overlapArea;
+          closestDistance = distance;
+          shapeToFill = shape;
+        }
+      }
+    }
+    
+    if (!shapeToFill) {
+      toast.error('No suitable shape found to fill');
+      return;
+    }
+    
+    try {
+      // Get the image element and create a canvas to resize it
+      const imgElement = activeObject.getElement();
+      const tempCanvas = document.createElement('canvas');
+      const ctx = tempCanvas.getContext('2d');
+      
+      // Get shape dimensions
+      let shapeWidth, shapeHeight;
+      
+      if (shapeToFill.type === 'circle') {
+        shapeWidth = shapeHeight = shapeToFill.radius * 2 * (shapeToFill.scaleX || 1);
+      } else if (shapeToFill.type === 'text' || shapeToFill.type === 'textbox') {
+        const bounds = shapeToFill.getBoundingRect();
+        // Add padding to prevent cutting when font size increases
+        const padding = Math.max(20, (shapeToFill.fontSize || 20) * 0.2);
+        shapeWidth = bounds.width + padding * 2;
+        shapeHeight = bounds.height + padding * 2;
+      } else {
+        shapeWidth = (shapeToFill.width || 100) * (shapeToFill.scaleX || 1);
+        shapeHeight = (shapeToFill.height || 100) * (shapeToFill.scaleY || 1);
+      }
+      
+      // Set canvas size to match shape
+      tempCanvas.width = shapeWidth;
+      tempCanvas.height = shapeHeight;
+      
+      // Draw image to fit the shape
+      ctx.drawImage(imgElement, 0, 0, shapeWidth, shapeHeight);
+      
+      // Create pattern from resized image
+      const pattern = new fabric.Pattern({
+        source: tempCanvas,
+        repeat: 'no-repeat'
+      });
+      
+      // Apply pattern as fill to the shape
+      shapeToFill.set('fill', pattern);
+      
+      // Remove the original image
+      canvas.remove(activeObject);
+      
+      // Select the filled shape
+      canvas.setActiveObject(shapeToFill);
+      
+      canvas.renderAll();
+      updateLayers();
+      saveToHistory();
+      toast.success('Shape filled with image!');
+      
+    } catch (error) {
+      console.error('Fill shape error:', error);
+      toast.error('Failed to fill shape with image');
+    }
   }, [canvas, activeObject, updateLayers, saveToHistory]);
 
   // Add keyboard shortcuts for undo/redo
@@ -761,11 +1018,17 @@ const groupSelectedLayers = useCallback(() => {
     maskWithShape,
     maskWithText,
     removeMask,
+    maskImageWithCustomShape,
+    fillShapeWithImage,
     resizeCanvas,
     moveLayerUp,
     moveLayerDown,
     moveLayerToTop,
-    moveLayerToBottom
+    moveLayerToBottom,
+    isDrawingCustom,
+    setIsDrawingCustom,
+    customPath,
+    setCustomPath
   };
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;

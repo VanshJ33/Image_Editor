@@ -19,7 +19,7 @@ import ElementsPanel from './ElementsPanel';
 
 
 const LeftSidebar = () => {
-  const { canvas, saveToHistory, setCanvasSize, backgroundColor, setBackgroundColor, updateLayers, resizeCanvas } = useEditor();
+  const { canvas, saveToHistory, setCanvasSize, backgroundColor, setBackgroundColor, updateLayers, resizeCanvas, isDrawingCustom, setIsDrawingCustom, customPath, setCustomPath } = useEditor();
   const [activeTab, setActiveTab] = useState('templates');
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -89,13 +89,17 @@ const LeftSidebar = () => {
 
   const addText = () => {
     if (canvas) {
+      const canvasWidth = canvas.getWidth();
+      const textWidth = Math.min(600, canvasWidth * 0.6); // Max 60% of canvas width
+      
       const text = new Textbox('Add your text here', {
         left: 100,
         top: 100,
-        width: 300,
+        width: textWidth,
         fontSize: 32,
         fontFamily: 'Inter',
         fill: '#1e293b',
+        splitByGrapheme: true, // Proper word wrapping
       });
       canvas.add(text);
       canvas.setActiveObject(text);
@@ -106,14 +110,18 @@ const LeftSidebar = () => {
 
   const addHeading = () => {
     if (canvas) {
+      const canvasWidth = canvas.getWidth();
+      const textWidth = Math.min(800, canvasWidth * 0.7); // Max 70% of canvas width
+      
       const text = new Textbox('Heading Text', {
         left: 100,
         top: 100,
-        width: 500,
+        width: textWidth,
         fontSize: 64,
         fontFamily: 'Playfair Display',
         fontWeight: 'bold',
         fill: '#1e293b',
+        splitByGrapheme: true,
       });
       canvas.add(text);
       canvas.setActiveObject(text);
@@ -124,14 +132,18 @@ const LeftSidebar = () => {
 
   const addSubheading = () => {
     if (canvas) {
+      const canvasWidth = canvas.getWidth();
+      const textWidth = Math.min(600, canvasWidth * 0.65); // Max 65% of canvas width
+      
       const text = new Textbox('Subheading Text', {
         left: 100,
         top: 100,
-        width: 400,
+        width: textWidth,
         fontSize: 36,
         fontFamily: 'Montserrat',
         fontWeight: '600',
         fill: '#475569',
+        splitByGrapheme: true,
       });
       canvas.add(text);
       canvas.setActiveObject(text);
@@ -142,13 +154,17 @@ const LeftSidebar = () => {
 
   const addTextWithEffect = (effect) => {
     if (canvas) {
+      const canvasWidth = canvas.getWidth();
+      const textWidth = Math.min(500, canvasWidth * 0.6); // Max 60% of canvas width
+      
       let textConfig = {
         left: 100,
         top: 100,
-        width: 300,
+        width: textWidth,
         fontSize: 48,
         fontFamily: 'Inter',
         fontWeight: 'bold',
+        splitByGrapheme: true, // Proper word wrapping
       };
 
       switch (effect) {
@@ -590,15 +606,19 @@ const LeftSidebar = () => {
           break;
       }
 
+      const canvasWidth = canvas.getWidth();
+      const textWidth = Math.min(600, canvasWidth * 0.65); // Max 65% of canvas width
+
       const text = new Textbox(textContent, {
         left: 100,
         top: 100,
-        width: 400,
+        width: textWidth,
         fontSize: 36,
         fontFamily: 'Inter',
         fontWeight: '600',
         fill: '#1e293b',
-        charSpacing: letterSpacing
+        charSpacing: letterSpacing,
+        splitByGrapheme: true, // Proper word wrapping
       });
 
       canvas.add(text);
@@ -610,15 +630,10 @@ const LeftSidebar = () => {
   };
 
   // Custom shape creation tool
-  const [isDrawingCustom, setIsDrawingCustom] = useState(false);
-  const [customPath, setCustomPath] = useState([]);
-  const [isCustomPathComplete, setIsCustomPathComplete] = useState(false);
-
   const startCustomShape = () => {
     setIsDrawingCustom(true);
     setCustomPath([]);
-    setIsCustomPathComplete(false);
-    toast.info('Click on canvas to start drawing your custom shape. Right-click to finish.');
+    toast.info('Click on canvas to place points for your custom shape. Right-click to finish.');
   };
 
   const finishCustomShape = () => {
@@ -627,13 +642,27 @@ const LeftSidebar = () => {
       return;
     }
     
-    if (canvas) {
-      const path = new Path(customPath.join(' '), {
-        left: 100,
-        top: 100,
+    if (canvas && customPath.length > 0) {
+      // Clear visual indicator points and lines
+      const objects = canvas.getObjects();
+      objects.forEach(obj => {
+        if (obj.name === 'customShapePoint' || obj.name === 'customShapeLine') {
+          canvas.remove(obj);
+        }
+      });
+      
+      // Convert array of {x, y} to SVG path string
+      const pathString = customPath.map((point, index) => {
+        if (index === 0) return `M ${point.x} ${point.y}`;
+        return `L ${point.x} ${point.y}`;
+      }).join(' ') + ' Z'; // Close the path
+      
+      const path = new Path(pathString, {
         fill: '#4f46e5',
         stroke: '#3b82f6',
         strokeWidth: 2,
+        originX: 'left',
+        originY: 'top'
       });
       
       canvas.add(path);
@@ -644,7 +673,6 @@ const LeftSidebar = () => {
       
       setIsDrawingCustom(false);
       setCustomPath([]);
-      setIsCustomPathComplete(false);
       toast.success('Custom shape created!');
     }
   };
@@ -652,14 +680,19 @@ const LeftSidebar = () => {
   const addShape = (shapeType) => {
     if (canvas) {
       let shape;
+      const getStrokeWidth = (size) => Math.max(1, Math.min(8, size / 25));
+      
       switch (shapeType) {
         case 'rectangle':
+          const rectSize = Math.min(200, 150);
           shape = new Rect({
             left: 100,
             top: 100,
             width: 200,
             height: 150,
             fill: '#4f46e5',
+            stroke: '#3730a3',
+            strokeWidth: getStrokeWidth(rectSize),
             rx: 8,
             ry: 8,
           });
@@ -670,6 +703,8 @@ const LeftSidebar = () => {
             top: 100,
             radius: 75,
             fill: '#06b6d4',
+            stroke: '#0891b2',
+            strokeWidth: getStrokeWidth(75),
           });
           break;
         case 'triangle':
@@ -679,6 +714,8 @@ const LeftSidebar = () => {
             width: 150,
             height: 150,
             fill: '#10b981',
+            stroke: '#059669',
+            strokeWidth: getStrokeWidth(150),
           });
           break;
         case 'line':
@@ -705,6 +742,8 @@ const LeftSidebar = () => {
             left: 100,
             top: 100,
             fill: '#f59e0b',
+            stroke: '#d97706',
+            strokeWidth: getStrokeWidth(outerRadius),
           });
           break;
         case 'diamond':
@@ -717,6 +756,8 @@ const LeftSidebar = () => {
             left: 100,
             top: 100,
             fill: '#ec4899',
+            stroke: '#be185d',
+            strokeWidth: getStrokeWidth(50),
           });
           break;
         case 'hexagon':
@@ -732,6 +773,8 @@ const LeftSidebar = () => {
             left: 100,
             top: 100,
             fill: '#8b5cf6',
+            stroke: '#7c3aed',
+            strokeWidth: getStrokeWidth(40),
           });
           break;
         case 'arrow':
@@ -766,6 +809,8 @@ const LeftSidebar = () => {
             rx: 80,
             ry: 50,
             fill: '#14b8a6',
+            stroke: '#0f766e',
+            strokeWidth: getStrokeWidth(Math.min(80, 50)),
           });
           break;
         case 'pentagon':
@@ -867,6 +912,8 @@ case 'smallCircle':
     top: 100,
     radius: 20,
     fill: '#10b981',
+    stroke: '#059669',
+    strokeWidth: getStrokeWidth(20),
   });
   break;
 
@@ -876,6 +923,8 @@ case 'dot':
     top: 100,
     radius: 8,
     fill: '#ef4444',
+    stroke: '#dc2626',
+    strokeWidth: Math.max(0.5, getStrokeWidth(8)),
   });
   break;
 
@@ -886,6 +935,8 @@ case 'oval':
     rx: 40,
     ry: 25,
     fill: '#f59e0b',
+    stroke: '#d97706',
+    strokeWidth: getStrokeWidth(Math.min(40, 25)),
   });
   break;
 
@@ -2473,17 +2524,33 @@ case 'loader':
 
 
 
-
-  const backgroundColors = [
-    '#ffffff', '#f8fafc', '#f1f5f9', '#e2e8f0',
-    '#1e293b', '#0f172a', '#020617',
-    '#fef3c7', '#fef08a', '#fde047', '#facc15',
-    '#fce7f3', '#fbcfe8', '#f9a8d4', '#f472b6',
-    '#ddd6fe', '#c4b5fd', '#a78bfa', '#8b5cf6',
-    '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6',
-    '#a7f3d0', '#6ee7b7', '#34d399', '#10b981',
-    '#fed7aa', '#fdba74', '#fb923c', '#f97316',
-  ];
+const backgroundColors = [
+  '#ffffff', '#f8fafc', '#f1f5f9', '#e2e8f0',
+  '#1e293b', '#0f172a', '#020617',
+  '#fef3c7', '#fef08a', '#fde047', '#facc15',
+  '#fce7f3', '#fbcfe8', '#f9a8d4', '#f472b6',
+  '#ddd6fe', '#c4b5fd', '#a78bfa', '#8b5cf6',
+  '#bfdbfe', '#93c5fd', '#60a5fa', '#3b82f6',
+  '#a7f3d0', '#6ee7b7', '#34d399', '#10b981',
+  '#fed7aa', '#fdba74', '#fb923c', '#f97316',
+  // Gradients
+  'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+  'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+  'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)',
+  'linear-gradient(135deg, #43e97b 0%, #38f9d7 100%)',
+  'linear-gradient(135deg, #fa709a 0%, #fee140 100%)',
+  'linear-gradient(135deg, #30cfd0 0%, #330867 100%)',
+  'linear-gradient(135deg, #a8edea 0%, #fed6e3 100%)',
+  'linear-gradient(135deg, #ff9a9e 0%, #fecfef 100%, #fecfef 100%)',
+  'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+  'linear-gradient(135deg, #ff6e7f 0%, #bfe9ff 100%)',
+  'linear-gradient(135deg, #e0c3fc 0%, #8ec5fc 100%)',
+  'linear-gradient(135deg, #f093fb 0%, #f5576c 100%)',
+  'linear-gradient(135deg, #fdfcfb 0%, #e2d1c3 100%)',
+  'linear-gradient(135deg, #89f7fe 0%, #66a6ff 100%)',
+  'linear-gradient(135deg, #fddb92 0%, #d1fdff 100%)',
+  'linear-gradient(135deg, #9890e3 0%, #b1f4cf 100%)',
+];
 
   const getCurrentBackgroundColor = () => {
     if (!canvas) return backgroundColor;
@@ -2506,22 +2573,57 @@ case 'loader':
   const handleBackgroundColor = (color) => {
     if (!canvas) return;
     
-    // Cache background object for performance
-    if (!backgroundObjRef.current) {
-      const objects = canvas.getObjects();
-      backgroundObjRef.current = objects.find(obj => 
-        obj.type === 'rect' && 
-        obj.left === 0 && 
-        obj.top === 0 && 
-        (obj.width >= canvas.width * 0.9 || obj.height >= canvas.height * 0.9)
-      );
+    let fillValue = color;
+    
+    // Convert CSS gradient to Fabric.js gradient
+    if (color.startsWith('linear-gradient')) {
+      const gradientMatch = color.match(/linear-gradient\(([^,]+),\s*(.+)\)/);
+      if (gradientMatch) {
+        const angle = gradientMatch[1].replace('deg', '').trim();
+        const colorStops = gradientMatch[2].split(/,\s*(?=[#a-zA-Z])/);
+        
+        const stops = colorStops.map((stop, index) => {
+          const parts = stop.trim().split(/\s+/);
+          const color = parts[0];
+          const position = parts[1] ? parseFloat(parts[1]) / 100 : index / (colorStops.length - 1);
+          return { offset: position, color };
+        });
+        
+        // Convert angle to coordinates
+        const angleRad = (parseFloat(angle) || 135) * Math.PI / 180;
+        const x1 = 0.5 - Math.cos(angleRad) * 0.5;
+        const y1 = 0.5 - Math.sin(angleRad) * 0.5;
+        const x2 = 0.5 + Math.cos(angleRad) * 0.5;
+        const y2 = 0.5 + Math.sin(angleRad) * 0.5;
+        
+        fillValue = new Gradient({
+          type: 'linear',
+          coords: {
+            x1: x1 * canvas.width,
+            y1: y1 * canvas.height,
+            x2: x2 * canvas.width,
+            y2: y2 * canvas.height
+          },
+          colorStops: stops
+        });
+      }
     }
     
+    // Clear cache and find background object
+    backgroundObjRef.current = null;
+    const objects = canvas.getObjects();
+    const bgObject = objects.find(obj => 
+      obj.type === 'rect' && 
+      obj.left === 0 && 
+      obj.top === 0 && 
+      (obj.width >= canvas.width * 0.9 || obj.height >= canvas.height * 0.9)
+    );
+    
     // Update color immediately
-    if (backgroundObjRef.current) {
-      backgroundObjRef.current.set('fill', color);
+    if (bgObject) {
+      bgObject.set('fill', fillValue);
     } else {
-      canvas.backgroundColor = color;
+      canvas.backgroundColor = fillValue;
     }
       
     // Throttled render for smooth performance
@@ -2567,7 +2669,7 @@ case 'loader':
             evented: false
           });
           
-          // Remove existing background image
+         
           const objects = canvas.getObjects();
           const existingBg = objects.find(obj => obj.isBackgroundImage);
           if (existingBg) {
@@ -2825,7 +2927,10 @@ case 'loader':
                           whileTap={{ scale: 0.95 }}
                           onClick={() => handleBackgroundColor(color)}
                           className="w-full aspect-square rounded-lg border-2 border-slate-300 dark:border-slate-600 hover:border-indigo-500 transition-all shadow-sm"
-                          style={{ backgroundColor: color }}
+                          style={{ 
+                            background: color.startsWith('linear-gradient') ? color : `${color}`,
+                            backgroundColor: color.startsWith('linear-gradient') ? 'transparent' : color
+                          }}
                           title={color}
                         />
                       ))}
