@@ -1,5 +1,13 @@
 // Stickers API Configuration
-export const STICKER_APIS = {
+
+export interface StickerAPI {
+  baseUrl: string;
+  categories?: string[];
+  collections?: string[];
+  format: string;
+}
+
+export const STICKER_APIS: Record<string, StickerAPI> = {
   // OpenMoji - Open source emoji and icon project
   OPENMOJI: {
     baseUrl: 'https://openmoji.org/data',
@@ -29,8 +37,14 @@ export const STICKER_APIS = {
   }
 };
 
+export interface LocalSticker {
+  id: string;
+  name: string;
+  svg: string;
+}
+
 // Local sticker collections for offline use
-export const LOCAL_STICKERS = {
+export const LOCAL_STICKERS: Record<string, LocalSticker[]> = {
   shapes: [
     { id: 'circle', name: 'Circle', svg: '<circle cx="50" cy="50" r="40" fill="#4F46E5"/>' },
     { id: 'square', name: 'Square', svg: '<rect x="10" y="10" width="80" height="80" rx="8" fill="#06B6D4"/>' },
@@ -68,3 +82,4 @@ export const PERFORMANCE_CONFIG = {
   maxConcurrentRequests: 5,
   debounceDelay: 300
 };
+

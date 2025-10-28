@@ -1,13 +1,32 @@
-import { STICKER_APIS, LOCAL_STICKERS, CACHE_CONFIG, PERFORMANCE_CONFIG } from '../config/stickers-config.js';
+import { STICKER_APIS, LOCAL_STICKERS, CACHE_CONFIG, PERFORMANCE_CONFIG, LocalSticker } from '../config/stickers-config';
+
+interface Sticker {
+  id: string;
+  name: string;
+  svg?: string;
+  thumbnail?: string;
+  category?: string;
+  source?: string;
+  collection?: string;
+}
+
+interface CacheEntry {
+  data: any;
+  timestamp: number;
+}
 
 class StickerService {
+  private cache: Map<string, CacheEntry>;
+  private requestQueue: any[];
+  private activeRequests: number;
+
   constructor() {
     this.cache = new Map();
     this.requestQueue = [];
     this.activeRequests = 0;
   }
 
-  setCache(key, data) {
+  setCache(key: string, data: any): void {
     if (this.cache.size >= CACHE_CONFIG.maxSize) {
       const firstKey = this.cache.keys().next().value;
       this.cache.delete(firstKey);
@@ -15,7 +34,7 @@ class StickerService {
     this.cache.set(key, { data, timestamp: Date.now() });
   }
 
-  getCache(key) {
+  getCache(key: string): any {
     const cached = this.cache.get(key);
     if (!cached) return null;
     if (Date.now() - cached.timestamp > CACHE_CONFIG.ttl) {
@@ -25,7 +44,7 @@ class StickerService {
     return cached.data;
   }
 
-  getLocalStickers(category = null) {
+  getLocalStickers(category: string | null = null): Sticker[] {
     if (category && LOCAL_STICKERS[category]) {
       return LOCAL_STICKERS[category].map(sticker => ({
         ...sticker,
@@ -44,12 +63,13 @@ class StickerService {
     );
   }
 
-  generateSvgDataUrl(svgContent, size = PERFORMANCE_CONFIG.thumbnailSize) {
+  generateSvgDataUrl(svgContent: string | undefined, size: number = PERFORMANCE_CONFIG.thumbnailSize): string {
+    if (!svgContent) return '';
     const svg = `<svg width="${size}" height="${size}" viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">${svgContent}</svg>`;
     return `data:image/svg+xml;base64,${btoa(svg)}`;
   }
 
-  async fetchIconifyIcons(collection = 'mdi', search = '', limit = 20) {
+  async fetchIconifyIcons(collection: string = 'mdi', search: string = '', limit: number = 20): Promise<Sticker[]> {
     const cacheKey = `iconify_${collection}_${search}_${limit}`;
     const cached = this.getCache(cacheKey);
     if (cached) return cached;
@@ -59,7 +79,7 @@ class StickerService {
       const listResponse = await fetch(listUrl);
       const collectionData = await listResponse.json();
       
-      let icons = Object.keys(collectionData.icons || {});
+      let icons: string[] = Object.keys(collectionData.icons || {});
       
       if (search) {
         icons = icons.filter(icon => 
@@ -69,7 +89,7 @@ class StickerService {
       
       icons = icons.slice(0, limit);
       
-      const iconPromises = icons.map(async (iconName) => {
+      const iconPromises = icons.map(async (iconName): Promise<Sticker | null> => {
         const svgUrl = `${STICKER_APIS.ICONIFY.baseUrl}/${collection}/${iconName}.svg`;
         try {
           const svgResponse = await fetch(svgUrl);
@@ -88,7 +108,7 @@ class StickerService {
         }
       });
       
-      const results = (await Promise.all(iconPromises)).filter(Boolean);
+      const results = (await Promise.all(iconPromises)).filter(Boolean) as Sticker[];
       this.setCache(cacheKey, results);
       return results;
       
@@ -97,8 +117,8 @@ class StickerService {
     }
   }
 
-  async searchStickers(query = '', category = '', source = 'all', limit = 20) {
-    const results = [];
+  async searchStickers(query: string = '', category: string = '', source: string = 'all', limit: number = 20): Promise<Sticker[]> {
+    const results: Sticker[] = [];
     
     const localStickers = this.getLocalStickers(category);
     if (query) {
@@ -137,3 +157,4 @@ class StickerService {
 }
 
 export default new StickerService();
+

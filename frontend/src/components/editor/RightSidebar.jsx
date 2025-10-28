@@ -7,12 +7,14 @@ import { Input } from '../ui/input';
 import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, Wand2, GripVertical, Group, Ungroup, CheckSquare, Square, ChevronDown, ChevronRight, Image as ImageIcon, Paintbrush } from 'lucide-react';
+import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, Wand2, GripVertical, Group, Ungroup, CheckSquare, Square, ChevronDown, ChevronRight, Image as ImageIcon, Paintbrush, Sparkles, X } from 'lucide-react';
 import { motion, Reorder } from 'framer-motion';
 import { toast } from 'sonner';
-import { filters } from 'fabric';
 import * as fabric from 'fabric';
 import { allGoogleFonts, loadGoogleFont, searchFonts } from '../../utils/googleFonts';
+import { filterPresets } from '../../config/filters';
+import { textEffectPresets, applyTextEffect } from '../../config/textProperties';
+import { shapeStylePresets, shapeBorderPresets, applyShapeStyle, applyBorderPreset, shadowPresets, applyShadowToShape } from '../../config/shapeProperties';
 
 const LayerItem = ({ layer, index, selectedLayers, selectLayer, toggleLayerVisibility, toggleLayerLock, expandedGroups, toggleGroupExpansion, reorderLayers, ungroupLayer }) => {
   const isExpanded = expandedGroups.has(layer.id);
@@ -151,7 +153,11 @@ const RightSidebar = () => {
     maskWithShape,
     maskWithText,
     removeMask,
-    maskImageWithCustomShape
+    maskImageWithCustomShape,
+    applyFilterPreset,
+    removeFilters,
+    activeFilterPreset,
+    setActiveFilterPreset
   } = useEditor();
   const [fontSearch, setFontSearch] = useState('');
   const [filteredFonts, setFilteredFonts] = useState(allGoogleFonts.slice(0, 100));
@@ -196,10 +202,19 @@ const RightSidebar = () => {
       } else {
         setFontSearch('');
       }
+      
+      // Check if filters are applied
+      if (activeObject.type === 'image' && activeObject.filters && activeObject.filters.length > 0) {
+        // Don't reset activeFilterPreset if there are existing filters
+        // It means a preset was applied
+      } else {
+        setActiveFilterPreset(null);
+      }
     } else {
       setFontSearch('');
+      setActiveFilterPreset(null);
     }
-  }, [activeObject]);
+  }, [activeObject, setActiveFilterPreset]);
 
   useEffect(() => {
     let filtered;
@@ -250,19 +265,19 @@ const RightSidebar = () => {
       const filterArray = [];
       
       if (properties.brightness !== 0) {
-        filterArray.push(new filters.Brightness({ brightness: properties.brightness / 100 }));
+        filterArray.push(new fabric.filters.Brightness({ brightness: properties.brightness / 100 }));
       }
       
       if (properties.contrast !== 0) {
-        filterArray.push(new filters.Contrast({ contrast: properties.contrast / 100 }));
+        filterArray.push(new fabric.filters.Contrast({ contrast: properties.contrast / 100 }));
       }
       
       if (properties.saturation !== 0) {
-        filterArray.push(new filters.Saturation({ saturation: properties.saturation / 100 }));
+        filterArray.push(new fabric.filters.Saturation({ saturation: properties.saturation / 100 }));
       }
       
       if (properties.blur > 0) {
-        filterArray.push(new filters.Blur({ blur: properties.blur / 100 }));
+        filterArray.push(new fabric.filters.Blur({ blur: properties.blur / 100 }));
       }
       
       activeObject.filters = filterArray;
@@ -468,10 +483,6 @@ const setAsBackground = () => {
             {activeObject ? (
               <>
                 <div className="flex gap-2">
-                  <Button onClick={duplicateObject} variant="outline" size="sm" className="flex-1 gap-2">
-                    <Copy className="w-4 h-4" />
-                    Duplicate
-                  </Button>
                   <Button onClick={deleteObject} variant="outline" size="sm" className="flex-1 gap-2 text-red-600 hover:text-red-700">
                     <Trash2 className="w-4 h-4" />
                     Delete
@@ -593,90 +604,47 @@ const setAsBackground = () => {
                     <div className="space-y-2">
                       <Label>Text Effects</Label>
                       <Select onValueChange={(effect) => {
-                        if (effect === 'none') {
-                          updateProperty('fill', '#000000');
-                          updateProperty('stroke', 'transparent');
-                          updateProperty('strokeWidth', 0);
-                          activeObject.set('shadow', null);
-                          activeObject.set('backgroundColor', '');
-                        } else if (effect === 'drop-shadow') {
-                          activeObject.set('shadow', new fabric.Shadow({
-                            color: 'rgba(0,0,0,0.3)',
-                            blur: 5,
-                            offsetX: 2,
-                            offsetY: 2
-                          }));
-                        } else if (effect === 'glow') {
-                          activeObject.set('shadow', new fabric.Shadow({
-                            color: 'rgba(0,0,0,0.5)',
-                            blur: 10,
-                            offsetX: 0,
-                            offsetY: 0
-                          }));
-                        } else if (effect === 'outline') {
-                          updateProperty('stroke', '#000000');
-                          updateProperty('strokeWidth', 2);
-                        } else if (effect === 'sunset-gradient') {
-                          const gradient = new fabric.Gradient({
-                            type: 'linear',
-                            coords: { x1: 0, y1: 0, x2: activeObject.width, y2: 0 },
-                            colorStops: [
-                              { offset: 0, color: '#ff6b6b' },
-                              { offset: 1, color: '#4ecdc4' }
-                            ]
-                          });
-                          updateProperty('fill', gradient);
-                        } else if (effect === 'neon') {
-                          updateProperty('fill', '#ff6b6b');
-                          activeObject.set('shadow', new fabric.Shadow({
-                            color: 'rgba(255,107,107,0.4)',
-                            blur: 8,
-                            offsetX: 0,
-                            offsetY: 0
-                          }));
-                        } else if (effect === 'gold') {
-                          updateProperty('fill', '#ffd700');
-                          activeObject.set('shadow', new fabric.Shadow({
-                            color: 'rgba(255,215,0,0.8)',
-                            blur: 12,
-                            offsetX: 3,
-                            offsetY: 3
-                          }));
-                          updateProperty('stroke', '#b8860b');
-                          updateProperty('strokeWidth', 2);
-                        } else if (effect === '80s-retro') {
-                          const gradient = new fabric.Gradient({
-                            type: 'linear',
-                            coords: { x1: 0, y1: 0, x2: 0, y2: activeObject.height },
-                            colorStops: [
-                              { offset: 0, color: '#ff6b9d' },
-                              { offset: 0.5, color: '#c44569' },
-                              { offset: 1, color: '#f8b500' }
-                            ]
-                          });
-                          updateProperty('fill', gradient);
-                          updateProperty('stroke', '#2c2c54');
-                          updateProperty('strokeWidth', 3);
-                        }
+                        applyTextEffect(activeObject, effect);
                         canvas.renderAll();
                         saveToHistory();
+                        toast.success(`${textEffectPresets[effect].name} applied!`);
                       }}>
                         <SelectTrigger>
                           <SelectValue placeholder="Choose effect" />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="none">None</SelectItem>
-                          <SelectItem value="drop-shadow">Drop Shadow</SelectItem>
-                          <SelectItem value="glow">Glow</SelectItem>
-                          <SelectItem value="outline">Outline</SelectItem>
-                          <SelectItem value="sunset-gradient">Sunset Gradient</SelectItem>
-                          <SelectItem value="neon">Neon</SelectItem>
-                          <SelectItem value="gold">Gold</SelectItem>
-                          <SelectItem value="80s-retro">80s Retro</SelectItem>
+                          {Object.entries(textEffectPresets).map(([key, preset]) => (
+                            <SelectItem key={key} value={key}>
+                              {preset.name}
+                            </SelectItem>
+                          ))}
                         </SelectContent>
                       </Select>
                     </div>
                   </>
+                )}
+
+                {activeObject.type !== 'textbox' && (
+                  <div className="space-y-2">
+                    <Label>Shape Style</Label>
+                    <Select onValueChange={(style) => {
+                      applyShapeStyle(activeObject, style);
+                      canvas.renderAll();
+                      saveToHistory();
+                      toast.success(`${shapeStylePresets[style].name} applied!`);
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose style" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(shapeStylePresets).map(([key, preset]) => (
+                          <SelectItem key={key} value={key}>
+                            {preset.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
                 )}
 
                 <div className="space-y-2">
@@ -790,6 +758,33 @@ const setAsBackground = () => {
                     />
                   </div>
                 </div>
+
+                {activeObject.type !== 'textbox' && (
+                  <div className="space-y-2">
+                    <Label>Shadow Effects</Label>
+                    <Select onValueChange={(shadowType) => {
+                      if (shadowType === 'none') {
+                        activeObject.set('shadow', null);
+                      } else {
+                        applyShadowToShape(activeObject, shadowPresets[shadowType]);
+                      }
+                      canvas.renderAll();
+                      saveToHistory();
+                      toast.success('Shadow applied!');
+                    }}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Choose shadow" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {Object.entries(shadowPresets).map(([key, preset]) => (
+                          <SelectItem key={key} value={key}>
+                            {preset.name || key.charAt(0).toUpperCase() + key.slice(1)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {activeObject.type === 'image' && (
                   <>
@@ -963,6 +958,48 @@ const setAsBackground = () => {
                             onChange={(e) => updateProperty('blur', parseInt(e.target.value))}
                             className="w-16"
                           />
+                        </div>
+                      </div>
+
+                      {/* Filter Presets */}
+                      <div className="space-y-3 mt-4 pt-4 border-t border-slate-200 dark:border-slate-700">
+                        <div className="flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4 text-indigo-600" />
+                            <Label className="font-semibold">Filter Presets</Label>
+                          </div>
+                          {activeFilterPreset && (
+                            <Button
+                              onClick={removeFilters}
+                              variant="ghost"
+                              size="sm"
+                              className="h-7 px-2 text-xs gap-1"
+                            >
+                              <X className="w-3 h-3" />
+                              Reset
+                            </Button>
+                          )}
+                        </div>
+                        <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto p-1">
+                          {filterPresets.map((preset) => (
+                            <motion.button
+                              key={preset.name}
+                              onClick={() => applyFilterPreset(preset)}
+                              className={`flex flex-col items-center justify-center gap-1 p-2 rounded-lg border-2 transition-all hover:scale-105 ${
+                                activeFilterPreset?.name === preset.name
+                                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
+                                  : 'border-slate-200 dark:border-slate-700 hover:border-indigo-400'
+                              }`}
+                              whileHover={{ scale: 1.05 }}
+                              whileTap={{ scale: 0.95 }}
+                              title={preset.name}
+                            >
+                              <span className="text-2xl">{preset.icon}</span>
+                              <span className="text-[10px] font-medium text-slate-700 dark:text-slate-300 text-center leading-tight">
+                                {preset.name}
+                              </span>
+                            </motion.button>
+                          ))}
                         </div>
                       </div>
                     </div>

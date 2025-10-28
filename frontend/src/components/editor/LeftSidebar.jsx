@@ -8,6 +8,8 @@ import { LayoutTemplate, Upload, Type, Shapes, Image as ImageIcon, Sparkles, Pal
 import { motion } from 'framer-motion';
 import { useEditor } from '../../contexts/EditorContext';
 import { Textbox, Rect, Circle, Triangle, Line, FabricImage, FabricText, Polygon, Ellipse, Path, Gradient, Group, FabricObject } from 'fabric';
+import { applySpacingPreset, textSpacingPresets, defaultTextProperties, textEffectPresets, applyTextEffect, textHeadingPresets, textCurvePresets, createCurvedTextGroup, applyCurvePreset } from '../../config/textProperties';
+import { defaultShapeProperties, commonShapeColors, createShape, createPresetShape } from '../../config/shapeProperties';
 
 import { toast } from 'sonner';
 import { loadGoogleFont } from '../../utils/googleFonts';
@@ -42,6 +44,7 @@ const LeftSidebar = () => {
         fontsToLoad.add(objData.fontFamily);
       }
     });
+    
     
     for (const font of fontsToLoad) {
       await loadGoogleFont(font);
@@ -88,545 +91,131 @@ const LeftSidebar = () => {
 
 
   const addText = () => {
-    if (canvas) {
-      const canvasWidth = canvas.getWidth();
-      const textWidth = Math.min(600, canvasWidth * 0.6); // Max 60% of canvas width
-      
-      const text = new Textbox('Add your text here', {
-        left: 100,
-        top: 100,
-        width: textWidth,
-        fontSize: 32,
-        fontFamily: 'Inter',
-        fill: '#1e293b',
-        splitByGrapheme: true, // Proper word wrapping
-      });
-      canvas.add(text);
-      canvas.setActiveObject(text);
-      canvas.renderAll();
-      updateLayers();
-    }
+    if (!canvas) return;
+    const canvasWidth = canvas.getWidth();
+    const textWidth = Math.min(600, canvasWidth * 0.6);
+    const text = new Textbox('Add your text here', {
+      left: 100,
+      top: 100,
+      width: textWidth,
+      splitByGrapheme: true,
+    });
+    Object.entries(textHeadingPresets.body.properties).forEach(([k, v]) => text.set(k, v));
+    canvas.add(text);
+    canvas.setActiveObject(text);
+    canvas.renderAll();
+    updateLayers();
   };
 
   const addHeading = () => {
-    if (canvas) {
-      const canvasWidth = canvas.getWidth();
-      const textWidth = Math.min(800, canvasWidth * 0.7); // Max 70% of canvas width
-      
-      const text = new Textbox('Heading Text', {
-        left: 100,
-        top: 100,
-        width: textWidth,
-        fontSize: 64,
-        fontFamily: 'Playfair Display',
-        fontWeight: 'bold',
-        fill: '#1e293b',
-        splitByGrapheme: true,
-      });
-      canvas.add(text);
-      canvas.setActiveObject(text);
-      canvas.renderAll();
-      updateLayers();
-    }
+    if (!canvas) return;
+    const canvasWidth = canvas.getWidth();
+    const textWidth = Math.min(800, canvasWidth * 0.7);
+    const text = new Textbox('Heading Text', {
+      left: 100,
+      top: 100,
+      width: textWidth,
+      splitByGrapheme: true,
+    });
+    Object.entries(textHeadingPresets.heading.properties).forEach(([k, v]) => text.set(k, v));
+    canvas.add(text);
+    canvas.setActiveObject(text);
+    canvas.renderAll();
+    updateLayers();
   };
 
   const addSubheading = () => {
-    if (canvas) {
-      const canvasWidth = canvas.getWidth();
-      const textWidth = Math.min(600, canvasWidth * 0.65); // Max 65% of canvas width
-      
-      const text = new Textbox('Subheading Text', {
-        left: 100,
-        top: 100,
-        width: textWidth,
-        fontSize: 36,
-        fontFamily: 'Montserrat',
-        fontWeight: '600',
-        fill: '#475569',
-        splitByGrapheme: true,
-      });
-      canvas.add(text);
-      canvas.setActiveObject(text);
-      canvas.renderAll();
-      updateLayers();
-    }
+    if (!canvas) return;
+    const canvasWidth = canvas.getWidth();
+    const textWidth = Math.min(600, canvasWidth * 0.65);
+    const text = new Textbox('Subheading Text', {
+      left: 100,
+      top: 100,
+      width: textWidth,
+      splitByGrapheme: true,
+    });
+    Object.entries(textHeadingPresets.subheading.properties).forEach(([k, v]) => text.set(k, v));
+    canvas.add(text);
+    canvas.setActiveObject(text);
+    canvas.renderAll();
+    updateLayers();
   };
 
   const addTextWithEffect = (effect) => {
-    if (canvas) {
-      const canvasWidth = canvas.getWidth();
-      const textWidth = Math.min(500, canvasWidth * 0.6); // Max 60% of canvas width
-      
-      let textConfig = {
-        left: 100,
-        top: 100,
-        width: textWidth,
-        fontSize: 48,
-        fontFamily: 'Inter',
-        fontWeight: 'bold',
-        splitByGrapheme: true, // Proper word wrapping
-      };
+    if (!canvas) return;
 
-      switch (effect) {
-        case 'shadow':
-          textConfig = {
-            ...textConfig,
-            text: 'Shadow Text',
-            fill: '#1e293b',
-            shadow: {
-              color: 'rgba(0,0,0,0.3)',
-              blur: 5,
-              offsetX: 3,
-              offsetY: 3
-            }
-          };
-          break;
-        case 'outline':
-          textConfig = {
-            ...textConfig,
-            text: 'Outline Text',
-            fill: 'transparent',
-            stroke: '#1e293b',
-            strokeWidth: 2
-          };
-          break;
-        case 'gradient':
-          textConfig = {
-            ...textConfig,
-            text: 'Gradient Text',
-            fill: new Gradient({
-              type: 'linear',
-              coords: { x1: 0, y1: 0, x2: 100, y2: 0 },
-              colorStops: [
-                { offset: 0, color: '#8b5cf6' },
-                { offset: 1, color: '#ec4899' }
-              ]
-            })
-          };
-          break;
-        case 'glow':
-          textConfig = {
-            ...textConfig,
-            text: 'Glow Text',
-            fill: '#4f46e5',
-            shadow: {
-              color: '#4f46e5',
-              blur: 15,
-              offsetX: 0,
-              offsetY: 0
-            }
-          };
-          break;
-        case '3d':
-          textConfig = {
-            ...textConfig,
-            text: '3D Text',
-            fill: '#1e293b',
-            shadow: {
-              color: 'rgba(0,0,0,0.8)',
-              blur: 0,
-              offsetX: 4,
-              offsetY: 4
-            },
-            stroke: '#64748b',
-            strokeWidth: 1
-          };
-          break;
-        case 'neon':
-          textConfig = {
-            ...textConfig,
-            text: 'Neon Text',
-            fill: '#ff0080',
-            shadow: {
-              color: '#ff0080',
-              blur: 20,
-              offsetX: 0,
-              offsetY: 0
-            },
-            stroke: '#ffffff',
-            strokeWidth: 1
-          };
-          break;
-        case 'vintage':
-          textConfig = {
-            ...textConfig,
-            text: 'Vintage Text',
-            fill: '#8b4513',
-            shadow: {
-              color: 'rgba(139, 69, 19, 0.4)',
-              blur: 3,
-              offsetX: 2,
-              offsetY: 2
-            },
-            fontFamily: 'Playfair Display',
-            opacity: 0.9
-          };
-          break;
-        case 'metallic':
-          textConfig = {
-            ...textConfig,
-            text: 'Metallic Text',
-            fill: new Gradient({
-              type: 'linear',
-              coords: { x1: 0, y1: 0, x2: 0, y2: 100 },
-              colorStops: [
-                { offset: 0, color: '#e5e7eb' },
-                { offset: 0.5, color: '#9ca3af' },
-                { offset: 1, color: '#374151' }
-              ]
-            }),
-            stroke: '#1f2937',
-            strokeWidth: 1
-          };
-          break;
-        case 'rainbow':
-          textConfig = {
-            ...textConfig,
-            text: 'Rainbow Text',
-            fill: new Gradient({
-              type: 'linear',
-              coords: { x1: 0, y1: 0, x2: 200, y2: 0 },
-              colorStops: [
-                { offset: 0, color: '#ff0000' },
-                { offset: 0.16, color: '#ff8000' },
-                { offset: 0.33, color: '#ffff00' },
-                { offset: 0.5, color: '#00ff00' },
-                { offset: 0.66, color: '#0080ff' },
-                { offset: 0.83, color: '#8000ff' },
-                { offset: 1, color: '#ff0080' }
-              ]
-            })
-          };
-          break;
-        case 'emboss':
-          textConfig = {
-            ...textConfig,
-            text: 'Emboss Text',
-            fill: '#f3f4f6',
-            shadow: {
-              color: 'rgba(255,255,255,0.8)',
-              blur: 1,
-              offsetX: -1,
-              offsetY: -1
-            },
-            stroke: 'rgba(0,0,0,0.2)',
-            strokeWidth: 1
-          };
-          break;
-        case 'glassmorphism':
-          textConfig = {
-            ...textConfig,
-            text: 'Glass Text',
-            fill: 'rgba(255,255,255,0.9)',
-            shadow: {
-              color: 'rgba(255,255,255,0.3)',
-              blur: 10,
-              offsetX: 0,
-              offsetY: 0
-            },
-            stroke: 'rgba(255,255,255,0.2)',
-            strokeWidth: 1,
-            opacity: 0.8
-          };
-          break;
-        case 'cyberpunk':
-          textConfig = {
-            ...textConfig,
-            text: 'Cyber Text',
-            fill: '#00ffff',
-            shadow: {
-              color: '#00ffff',
-              blur: 25,
-              offsetX: 0,
-              offsetY: 0
-            },
-            fontFamily: 'Orbitron'
-          };
-          break;
-        case 'holographic':
-          textConfig = {
-            ...textConfig,
-            text: 'Holo Text',
-            fill: new Gradient({
-              type: 'linear',
-              coords: { x1: 0, y1: 0, x2: 200, y2: 0 },
-              colorStops: [
-                { offset: 0, color: '#ff0080' },
-                { offset: 0.25, color: '#8000ff' },
-                { offset: 0.5, color: '#0080ff' },
-                { offset: 0.75, color: '#00ff80' },
-                { offset: 1, color: '#ff8000' }
-              ]
-            }),
-            shadow: {
-              color: 'rgba(255,255,255,0.5)',
-              blur: 15,
-              offsetX: 0,
-              offsetY: 0
-            }
-          };
-          break;
-        case 'chrome':
-          textConfig = {
-            ...textConfig,
-            text: 'Chrome Text',
-            fill: new Gradient({
-              type: 'linear',
-              coords: { x1: 0, y1: 0, x2: 0, y2: 100 },
-              colorStops: [
-                { offset: 0, color: '#f8fafc' },
-                { offset: 0.3, color: '#e2e8f0' },
-                { offset: 0.7, color: '#94a3b8' },
-                { offset: 1, color: '#475569' }
-              ]
-            }),
-            stroke: '#1e293b',
-            strokeWidth: 1
-          };
-          break;
-        case 'fire':
-          textConfig = {
-            ...textConfig,
-            text: 'Fire Text',
-            fill: new Gradient({
-              type: 'linear',
-              coords: { x1: 0, y1: 100, x2: 0, y2: 0 },
-              colorStops: [
-                { offset: 0, color: '#dc2626' },
-                { offset: 0.5, color: '#f97316' },
-                { offset: 1, color: '#fbbf24' }
-              ]
-            }),
-            shadow: {
-              color: '#f97316',
-              blur: 20,
-              offsetX: 0,
-              offsetY: 0
-            }
-          };
-          break;
-        case 'ice':
-          textConfig = {
-            ...textConfig,
-            text: 'Ice Text',
-            fill: new Gradient({
-              type: 'linear',
-              coords: { x1: 0, y1: 0, x2: 0, y2: 100 },
-              colorStops: [
-                { offset: 0, color: '#dbeafe' },
-                { offset: 0.5, color: '#60a5fa' },
-                { offset: 1, color: '#2563eb' }
-              ]
-            }),
-            shadow: {
-              color: '#60a5fa',
-              blur: 15,
-              offsetX: 0,
-              offsetY: 0
-            },
-            stroke: '#ffffff',
-            strokeWidth: 1
-          };
-          break;
-        case 'gold':
-          textConfig = {
-            ...textConfig,
-            text: 'Gold Text',
-            fill: new Gradient({
-              type: 'linear',
-              coords: { x1: 0, y1: 0, x2: 0, y2: 100 },
-              colorStops: [
-                { offset: 0, color: '#fef3c7' },
-                { offset: 0.3, color: '#fbbf24' },
-                { offset: 0.7, color: '#d97706' },
-                { offset: 1, color: '#92400e' }
-              ]
-            }),
-            shadow: {
-              color: '#fbbf24',
-              blur: 10,
-              offsetX: 2,
-              offsetY: 2
-            },
-            stroke: '#92400e',
-            strokeWidth: 1
-          };
-          break;
-      }
+    const canvasWidth = canvas.getWidth();
+    const textWidth = Math.min(500, canvasWidth * 0.6);
 
-      const text = new Textbox(textConfig.text, textConfig);
-      canvas.add(text);
-      canvas.setActiveObject(text);
-      canvas.renderAll();
-      updateLayers();
-      saveToHistory();
-    }
+    const text = new Textbox('Text', {
+      left: 100,
+      top: 100,
+      width: textWidth,
+      fontSize: 48,
+      fontFamily: 'Inter',
+      fontWeight: 'bold',
+      splitByGrapheme: true,
+    });
+
+    applyTextEffect(text, effect);
+
+    canvas.add(text);
+    canvas.setActiveObject(text);
+    canvas.renderAll();
+    updateLayers();
+    saveToHistory();
   };
 
   const addCurvedText = (curveType) => {
-    if (canvas) {
-      let textConfig = {
-        left: 100,
-        top: 100,
-        fontSize: 36,
-        fontFamily: 'Inter',
-        fontWeight: 'bold',
-        fill: '#1e293b',
-      };
+    if (!canvas) return;
+    
+    const canvasWidth = canvas.getWidth();
+    const textWidth = Math.min(400, canvasWidth * 0.6);
+    
+    const text = new Textbox('Curved Text', {
+      left: 100,
+      top: 100,
+      width: textWidth,
+      ...defaultTextProperties,
+      splitByGrapheme: true,
+    });
 
-      let textContent = 'Curved Text';
+    applyCurvePreset(text, curveType);
 
-      switch (curveType) {
-        case 'arc':
-          textConfig = {
-            ...textConfig,
-            angle: -15,
-            skewX: 5
-          };
-          textContent = 'Arc Text';
-          break;
-        case 'circle':
-          textConfig = {
-            ...textConfig,
-            angle: 45,
-            originX: 'center',
-            originY: 'center'
-          };
-          textContent = 'Circle Text';
-          break;
-        case 'wave':
-          textConfig = {
-            ...textConfig,
-            skewY: 10,
-            scaleY: 0.8
-          };
-          textContent = 'Wave Text';
-          break;
-        case 'spiral':
-          textConfig = {
-            ...textConfig,
-            angle: 90,
-            skewX: -10,
-            skewY: 5
-          };
-          textContent = 'Spiral Text';
-          break;
-        case 'zigzag':
-          textConfig = {
-            ...textConfig,
-            skewX: 15,
-            skewY: -8,
-            angle: 5
-          };
-          textContent = 'Zigzag Text';
-          break;
-        case 'bounce':
-          textConfig = {
-            ...textConfig,
-            scaleY: 1.3,
-            skewY: -5,
-            angle: -8
-          };
-          textContent = 'Bounce Text';
-          break;
-        case 'tilt':
-          textConfig = {
-            ...textConfig,
-            angle: 25,
-            skewX: -5
-          };
-          textContent = 'Tilt Text';
-          break;
-        case 'perspective':
-          textConfig = {
-            ...textConfig,
-            skewX: -20,
-            scaleY: 0.7,
-            angle: 10
-          };
-          textContent = 'Perspective';
-          break;
-        case 'wobble':
-          textConfig = {
-            ...textConfig,
-            skewX: 8,
-            skewY: 12,
-            scaleX: 0.9
-          };
-          textContent = 'Wobble Text';
-          break;
-      }
-
-      const text = new Textbox(textContent, textConfig);
-      canvas.add(text);
-      canvas.setActiveObject(text);
-      canvas.renderAll();
-      updateLayers();
-      saveToHistory();
-    }
+    canvas.add(text);
+    canvas.setActiveObject(text);
+    canvas.renderAll();
+    updateLayers();
+    saveToHistory();
   };
 
-  const addSpacedText = (spacing) => {
-    if (canvas) {
-      let letterSpacing;
-      let textContent;
+  const addSpacedText = (presetName) => {
+    if (!canvas) return;
 
-      switch (spacing) {
-        case 'tight':
-          letterSpacing = -50;
-          textContent = 'Tight Text';
-          break;
-        case 'normal':
-          letterSpacing = 0;
-          textContent = 'Normal Text';
-          break;
-        case 'wide':
-          letterSpacing = 100;
-          textContent = 'Wide Text';
-          break;
-        case 'extra-wide':
-          letterSpacing = 200;
-          textContent = 'Extra Wide';
-          break;
-        case 'ultra-wide':
-          letterSpacing = 300;
-          textContent = 'Ultra Wide';
-          break;
-        case 'mega-wide':
-          letterSpacing = 400;
-          textContent = 'Mega Wide';
-          break;
-        case 'condensed':
-          letterSpacing = -100;
-          textContent = 'Condensed';
-          break;
-        case 'ultra-tight':
-          letterSpacing = -150;
-          textContent = 'Ultra Tight';
-          break;
-      }
+    const preset = textSpacingPresets.find(p => p.name === presetName);
+    const textContent = preset?.label || presetName || 'Text';
 
-      const canvasWidth = canvas.getWidth();
-      const textWidth = Math.min(600, canvasWidth * 0.65); // Max 65% of canvas width
+    const canvasWidth = canvas.getWidth();
+    const textWidth = Math.min(600, canvasWidth * 0.65);
 
-      const text = new Textbox(textContent, {
-        left: 100,
-        top: 100,
-        width: textWidth,
-        fontSize: 36,
-        fontFamily: 'Inter',
-        fontWeight: '600',
-        fill: '#1e293b',
-        charSpacing: letterSpacing,
-        splitByGrapheme: true, // Proper word wrapping
-      });
+    const text = new Textbox(textContent, {
+      left: 100,
+      top: 100,
+      width: textWidth,
+      ...defaultTextProperties,
+      fontSize: 36,
+      fontWeight: '600',
+      fill: '#1e293b',
+      splitByGrapheme: true,
+    });
 
-      canvas.add(text);
-      canvas.setActiveObject(text);
-      canvas.renderAll();
-      updateLayers();
-      saveToHistory();
-    }
+    applySpacingPreset(text, presetName);
+
+    canvas.add(text);
+    canvas.setActiveObject(text);
+    canvas.renderAll();
+    updateLayers();
+    saveToHistory();
   };
 
   // Custom shape creation tool
@@ -680,982 +269,269 @@ const LeftSidebar = () => {
   const addShape = (shapeType) => {
     if (canvas) {
       let shape;
-      const getStrokeWidth = (size) => Math.max(1, Math.min(8, size / 25));
-      
+      const getRandomColor = () => commonShapeColors[Math.floor(Math.random() * commonShapeColors.length)];
+      const baseOptions = { left: 100, top: 100, fill: getRandomColor() };
       switch (shapeType) {
         case 'rectangle':
-          const rectSize = Math.min(200, 150);
-          shape = new Rect({
-            left: 100,
-            top: 100,
-            width: 200,
-            height: 150,
-            fill: '#4f46e5',
-            stroke: '#3730a3',
-            strokeWidth: getStrokeWidth(rectSize),
-            rx: 8,
-            ry: 8,
-          });
+          shape = createShape('rectangle', { ...baseOptions, width: 200, height: 150, rx: 8, ry: 8 });
           break;
         case 'circle':
-          shape = new Circle({
-            left: 100,
-            top: 100,
-            radius: 75,
-            fill: '#06b6d4',
-            stroke: '#0891b2',
-            strokeWidth: getStrokeWidth(75),
-          });
+          shape = createShape('circle', { ...baseOptions, radius: 75 });
           break;
         case 'triangle':
-          shape = new Triangle({
-            left: 100,
-            top: 100,
-            width: 150,
-            height: 150,
-            fill: '#10b981',
-            stroke: '#059669',
-            strokeWidth: getStrokeWidth(150),
-          });
+          shape = createShape('triangle', { ...baseOptions, width: 150, height: 150 });
           break;
         case 'line':
-          shape = new Line([50, 100, 200, 100], {
-            left: 100,
-            top: 100,
-            stroke: '#1e293b',
-            strokeWidth: 3,
-          });
+          shape = createShape('line', { left: 100, top: 100, x1: 50, y1: 100, x2: 200, y2: 100, stroke: '#1e293b', strokeWidth: 3 });
           break;
         case 'star':
-          const starPoints = [];
-          const outerRadius = 50;
-          const innerRadius = 25;
-          for (let i = 0; i < 10; i++) {
-            const angle = (i * Math.PI) / 5;
-            const radius = i % 2 === 0 ? outerRadius : innerRadius;
-            starPoints.push({
-              x: Math.cos(angle) * radius,
-              y: Math.sin(angle) * radius
-            });
-          }
-          shape = new Polygon(starPoints, {
-            left: 100,
-            top: 100,
-            fill: '#f59e0b',
-            stroke: '#d97706',
-            strokeWidth: getStrokeWidth(outerRadius),
-          });
+          shape = createShape('star', { ...baseOptions, outerRadius: 50, innerRadius: 25, fill: '#f59e0b', stroke: '#d97706', strokeWidth: 3 });
           break;
         case 'diamond':
-          shape = new Polygon([
-            { x: 0, y: -50 },
-            { x: 50, y: 0 },
-            { x: 0, y: 50 },
-            { x: -50, y: 0 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#ec4899',
-            stroke: '#be185d',
-            strokeWidth: getStrokeWidth(50),
-          });
+          shape = createShape('diamond', { ...baseOptions, size: 50, fill: '#ec4899', stroke: '#be185d', strokeWidth: 3 });
           break;
         case 'hexagon':
-          const hexPoints = [];
-          for (let i = 0; i < 6; i++) {
-            const angle = (i * Math.PI) / 3;
-            hexPoints.push({
-              x: Math.cos(angle) * 40,
-              y: Math.sin(angle) * 40
-            });
-          }
-          shape = new Polygon(hexPoints, {
-            left: 100,
-            top: 100,
-            fill: '#8b5cf6',
-            stroke: '#7c3aed',
-            strokeWidth: getStrokeWidth(40),
-          });
+          shape = createShape('hexagon', { ...baseOptions, radius: 40, fill: '#8b5cf6', stroke: '#7c3aed', strokeWidth: 3 });
           break;
         case 'arrow':
-          shape = new Polygon([
-            { x: -40, y: -15 },
-            { x: 20, y: -15 },
-            { x: 20, y: -30 },
-            { x: 50, y: 0 },
-            { x: 20, y: 30 },
-            { x: 20, y: 15 },
-            { x: -40, y: 15 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#ef4444',
-          });
+          shape = createShape('arrow', { ...baseOptions, fill: '#ef4444' });
           break;
         case 'heart':
-          const heartPath = 'M12,21.35l-1.45-1.32C5.4,15.36,2,12.28,2,8.5 C2,5.42,4.42,3,7.5,3c1.74,0,3.41,0.81,4.5,2.09C13.09,3.81,14.76,3,16.5,3 C19.58,3,22,5.42,22,8.5c0,3.78-3.4,6.86-8.55,11.54L12,21.35z';
-          shape = new Path(heartPath, {
-            left: 100,
-            top: 100,
-            fill: '#f43f5e',
-            scaleX: 3,
-            scaleY: 3,
-          });
+          shape = createShape('heart', { ...baseOptions, fill: '#f43f5e' });
           break;
         case 'ellipse':
-          shape = new Ellipse({
-            left: 100,
-            top: 100,
-            rx: 80,
-            ry: 50,
-            fill: '#14b8a6',
-            stroke: '#0f766e',
-            strokeWidth: getStrokeWidth(Math.min(80, 50)),
-          });
+          shape = createShape('ellipse', { ...baseOptions, rx: 80, ry: 50, stroke: '#0f766e', strokeWidth: 2 });
           break;
         case 'pentagon':
-          const pentPoints = [];
-          for (let i = 0; i < 5; i++) {
-            const angle = (i * 2 * Math.PI) / 5 - Math.PI / 2;
-            pentPoints.push({
-              x: Math.cos(angle) * 40,
-              y: Math.sin(angle) * 40
-            });
-          }
-          shape = new Polygon(pentPoints, {
-            left: 100,
-            top: 100,
-            fill: '#f97316',
-          });
+          shape = createShape('pentagon', { ...baseOptions });
           break;
         case 'octagon':
-          const octPoints = [];
-          for (let i = 0; i < 8; i++) {
-            const angle = (i * Math.PI) / 4;
-            octPoints.push({
-              x: Math.cos(angle) * 40,
-              y: Math.sin(angle) * 40
-            });
-          }
-          shape = new Polygon(octPoints, {
-            left: 100,
-            top: 100,
-            fill: '#84cc16',
-          });
+          shape = createShape('octagon', { ...baseOptions });
           break;
         case 'cross':
-          shape = new Polygon([
-            { x: -10, y: -30 }, { x: 10, y: -30 },
-            { x: 10, y: -10 }, { x: 30, y: -10 },
-            { x: 30, y: 10 }, { x: 10, y: 10 },
-            { x: 10, y: 30 }, { x: -10, y: 30 },
-            { x: -10, y: 10 }, { x: -30, y: 10 },
-            { x: -30, y: -10 }, { x: -10, y: -10 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#dc2626',
-          });
+          shape = createShape('cross', { ...baseOptions });
           break;
         case 'plus':
-          shape = new Polygon([
-            { x: -8, y: -25 }, { x: 8, y: -25 },
-            { x: 8, y: -8 }, { x: 25, y: -8 },
-            { x: 25, y: 8 }, { x: 8, y: 8 },
-            { x: 8, y: 25 }, { x: -8, y: 25 },
-            { x: -8, y: 8 }, { x: -25, y: 8 },
-            { x: -25, y: -8 }, { x: -8, y: -8 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#059669',
-          });
+          shape = createShape('plus', { ...baseOptions });
           break;
         case 'minus':
-          shape = new Rect({
-            left: 100,
-            top: 100,
-            width: 50,
-            height: 8,
-            fill: '#6b7280',
-            rx: 4,
-            ry: 4,
-          });
+          shape = createShape('minus', baseOptions);
           break;
-          case 'thinRectangle':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 120,
-    height: 6,
-    fill: '#4f46e5',
-    rx: 3,
-    ry: 3,
-  });
-  break;
-
-case 'pill':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 80,
-    height: 25,
-    fill: '#06b6d4',
-    rx: 12,
-    ry: 12,
-  });
-  break;
-
-case 'smallCircle':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 20,
-    fill: '#10b981',
-    stroke: '#059669',
-    strokeWidth: getStrokeWidth(20),
-  });
-  break;
-
-case 'dot':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 8,
-    fill: '#ef4444',
-    stroke: '#dc2626',
-    strokeWidth: Math.max(0.5, getStrokeWidth(8)),
-  });
-  break;
-
-case 'oval':
-  shape = new Ellipse({
-    left: 100,
-    top: 100,
-    rx: 40,
-    ry: 25,
-    fill: '#f59e0b',
-    stroke: '#d97706',
-    strokeWidth: getStrokeWidth(Math.min(40, 25)),
-  });
-  break;
-
-case 'smallSquare':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 60,
-    height: 60,
-    fill: '#8b5cf6',
-    rx: 4,
-    ry: 4,
-  });
-  break;
-
-case 'verticalLine':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 6,
-    height: 80,
-    fill: '#ec4899',
-    rx: 3,
-    ry: 3,
-  });
-  break;
-
-case 'thickLine':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 100,
-    height: 12,
-    fill: '#f97316',
-    rx: 6,
-    ry: 6,
-  });
-  break;
-
-case 'capsule':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 60,
-    height: 30,
-    fill: '#84cc16',
-    rx: 15,
-    ry: 15,
-  });
-  break;
-
-case 'tinyCircle':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 12,
-    fill: '#dc2626',
-  });
-  break;
-
-case 'smallPill':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 50,
-    height: 15,
-    fill: '#0ea5e9',
-    rx: 7,
-    ry: 7,
-  });
-  break;
-
-case 'button':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 100,
-    height: 40,
-    fill: '#6366f1',
-    rx: 8,
-    ry: 8,
-    stroke: '#4f46e5',
-    strokeWidth: 2,
-  });
-  break;
-
-case 'badge':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 25,
-    fill: '#ec4899',
-    stroke: '#be185d',
-    strokeWidth: 3,
-  });
-  break;
-
-case 'progressBar':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 200,
-    height: 10,
-    fill: '#06b6d4',
-    rx: 5,
-    ry: 5,
-  });
-  break;
-
-case 'divider':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 180,
-    height: 2,
-    fill: '#6b7280',
-    rx: 1,
-    ry: 1,
-  });
-  break;
-
-case 'indicator':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 6,
-    fill: '#22c55e',
-  });
-  break;
-
-case 'toggle':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 45,
-    height: 25,
-    fill: '#d1d5db',
-    rx: 12,
-    ry: 12,
-  });
-  break;
-
-case 'toggleOn':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 45,
-    height: 25,
-    fill: '#10b981',
-    rx: 12,
-    ry: 12,
-  });
-  break;
-
-case 'slider':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 150,
-    height: 6,
-    fill: '#e5e7eb',
-    rx: 3,
-    ry: 3,
-  });
-  break;
-
-case 'sliderThumb':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 12,
-    fill: '#3b82f6',
-    stroke: '#1d4ed8',
-    strokeWidth: 2,
-  });
-  break;
-
-case 'inputField':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 180,
-    height: 45,
-    fill: 'white',
-    stroke: '#d1d5db',
-    strokeWidth: 2,
-    rx: 8,
-    ry: 8,
-  });
-  break;
-
-case 'card':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 160,
-    height: 120,
-    fill: 'white',
-    stroke: '#e5e7eb',
-    strokeWidth: 2,
-    rx: 12,
-    ry: 12,
-    shadow: 'rgba(0, 0, 0, 0.1) 0 2px 8px',
-  });
-  break;
-
-case 'chip':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 80,
-    height: 32,
-    fill: '#e0e7ff',
-    stroke: '#c7d2fe',
-    strokeWidth: 1,
-    rx: 16,
-    ry: 16,
-  });
-  break;
-
-case 'avatar':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 30,
-    fill: '#6b7280',
-    stroke: '#374151',
-    strokeWidth: 2,
-  });
-  break;
-
-case 'notification':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 10,
-    fill: '#ef4444',
-    stroke: '#dc2626',
-    strokeWidth: 1,
-  });
-  break;
-
-case 'statusOnline':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 8,
-    fill: '#22c55e',
-    stroke: '#16a34a',
-    strokeWidth: 1,
-  });
-  break;
-
-case 'statusOffline':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 8,
-    fill: '#6b7280',
-    stroke: '#4b5563',
-    strokeWidth: 1,
-  });
-  break;
-
-case 'statusAway':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 8,
-    fill: '#f59e0b',
-    stroke: '#d97706',
-    strokeWidth: 1,
-  });
-  break;
-
-case 'radio':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 12,
-    fill: 'white',
-    stroke: '#d1d5db',
-    strokeWidth: 2,
-  });
-  break;
-
-case 'radioSelected':
-  shape = new Group([
-    new Circle({
-      radius: 12,
-      fill: 'white',
-      stroke: '#3b82f6',
-      strokeWidth: 2,
-    }),
-    new Circle({
-      radius: 6,
-      fill: '#3b82f6',
-    })
-  ], {
-    left: 100,
-    top: 100,
-  });
-  break;
-
-case 'checkbox':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 20,
-    height: 20,
-    fill: 'white',
-    stroke: '#d1d5db',
-    strokeWidth: 2,
-    rx: 4,
-    ry: 4,
-  });
-  break;
-
-case 'checkboxChecked':
-  shape = new Group([
-    new Rect({
-      width: 20,
-      height: 20,
-      fill: '#3b82f6',
-      stroke: '#2563eb',
-      strokeWidth: 2,
-      rx: 4,
-      ry: 4,
-    })
-  ], {
-    left: 100,
-    top: 100,
-  });
-  break;
-
-case 'tag':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 70,
-    height: 28,
-    fill: '#f3f4f6',
-    stroke: '#d1d5db',
-    strokeWidth: 1,
-    rx: 14,
-    ry: 14,
-  });
-  break;
-
-case 'breadcrumb':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 25,
-    height: 25,
-    fill: '#f3f4f6',
-    stroke: '#d1d5db',
-    strokeWidth: 1,
-    rx: 4,
-    ry: 4,
-  });
-  break;
-
-case 'step':
-  shape = new Rect({
-    left: 100,
-    top: 100,
-    width: 30,
-    height: 4,
-    fill: '#3b82f6',
-    rx: 2,
-    ry: 2,
-  });
-  break;
-
-case 'loader':
-  shape = new Circle({
-    left: 100,
-    top: 100,
-    radius: 20,
-    fill: 'transparent',
-    stroke: '#3b82f6',
-    strokeWidth: 3,
-    strokeDashArray: [5, 5],
-  });
-  break;
-        case 'cloud':
-          const cloudPath = 'M25,60 C10,60 5,45 15,35 C5,25 15,15 25,20 C30,10 45,15 45,25 C55,20 65,30 55,40 C65,45 60,60 45,60 Z';
-          shape = new Path(cloudPath, {
-            left: 100,
-            top: 100,
-            fill: '#0ea5e9',
-            scaleX: 1.5,
-            scaleY: 1.5,
-          });
+        case 'thinRectangle':
+          shape = createShape('thinRectangle', baseOptions);
           break;
-        case 'lightning':
-          shape = new Polygon([
-            { x: -15, y: -30 }, { x: 5, y: -30 },
-            { x: -5, y: -5 }, { x: 15, y: -5 },
-            { x: -10, y: 30 }, { x: -5, y: 5 },
-            { x: -20, y: 5 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#fbbf24',
-          });
+        case 'pill':
+          shape = createShape('pill', baseOptions);
           break;
-        case 'moon':
-          const moonPath = 'M50,10 A40,40 0 1,0 50,90 A30,30 0 1,1 50,10 Z';
-          shape = new Path(moonPath, {
-            left: 100,
-            top: 100,
-            fill: '#fde047',
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+        case 'smallCircle':
+          shape = createShape('smallCircle', { ...baseOptions, stroke: baseOptions.fill === '#10b981' ? '#059669' : getRandomColor(), strokeWidth: 1 });
           break;
-        case 'sun':
-          const sunPoints = [];
-          for (let i = 0; i < 16; i++) {
-            const angle = (i * Math.PI) / 8;
-            const radius = i % 2 === 0 ? 35 : 20;
-            sunPoints.push({
-              x: Math.cos(angle) * radius,
-              y: Math.sin(angle) * radius
-            });
-          }
-          shape = new Polygon(sunPoints, {
-            left: 100,
-            top: 100,
-            fill: '#f59e0b',
-          });
+        case 'dot':
+          shape = createShape('dot', { ...baseOptions, stroke: baseOptions.fill === '#ef4444' ? '#dc2626' : getRandomColor(), strokeWidth: 1 });
           break;
-        case 'speech':
-          shape = new Polygon([
-            { x: -40, y: -25 }, { x: 40, y: -25 },
-            { x: 40, y: 10 }, { x: 5, y: 10 },
-            { x: -10, y: 25 }, { x: -5, y: 10 },
-            { x: -40, y: 10 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#6366f1',
-            rx: 10,
-            ry: 10,
-          });
+        case 'oval':
+          shape = createShape('oval', { ...baseOptions, stroke: baseOptions.fill === '#f59e0b' ? '#d97706' : getRandomColor(), strokeWidth: 1 });
+          break;
+        case 'smallSquare':
+          shape = createShape('smallSquare', baseOptions);
+          break;
+        case 'verticalLine':
+          shape = createShape('verticalLine', baseOptions);
+          break;
+        case 'thickLine':
+          shape = createShape('thickLine', baseOptions);
+          break;
+        case 'capsule':
+          shape = createShape('capsule', baseOptions);
+          break;
+        case 'tinyCircle':
+          shape = createShape('tinyCircle', baseOptions);
+          break;
+        case 'smallPill':
+          shape = createShape('smallPill', baseOptions);
+          break;
+        case 'button':
+          shape = createShape('button', { ...baseOptions, stroke: baseOptions.fill === '#6366f1' ? '#4f46e5' : getRandomColor(), strokeWidth: 2 });
           break;
         case 'badge':
-          const badgePoints = [];
-          for (let i = 0; i < 12; i++) {
-            const angle = (i * Math.PI) / 6;
-            const radius = i % 2 === 0 ? 45 : 35;
-            badgePoints.push({
-              x: Math.cos(angle) * radius,
-              y: Math.sin(angle) * radius
-            });
-          }
-          shape = new Polygon(badgePoints, {
+          shape = createPresetShape('badge', { left: 100, top: 100 });
+          break;
+        case 'progressBar':
+          shape = createShape('progressBar', baseOptions);
+          break;
+        case 'divider':
+          shape = createShape('divider', baseOptions);
+          break;
+        case 'indicator':
+          shape = createShape('indicator', baseOptions);
+          break;
+        case 'toggle':
+          shape = createShape('toggle', baseOptions);
+          break;
+        case 'toggleOn':
+          shape = createShape('toggleOn', baseOptions);
+          break;
+        case 'slider':
+          shape = createShape('slider', baseOptions);
+          break;
+        case 'sliderThumb':
+          shape = createShape('sliderThumb', { ...baseOptions, stroke: baseOptions.fill === '#3b82f6' ? '#1d4ed8' : getRandomColor(), strokeWidth: 2 });
+          break;
+        case 'inputField':
+          shape = createShape('inputField', { fill: 'white', stroke: '#d1d5db', strokeWidth: 2, left: 100, top: 100 });
+          break;
+        case 'card':
+          shape = createShape('card', { fill: 'white', stroke: '#e5e7eb', strokeWidth: 2, left: 100, top: 100, shadow: 'rgba(0, 0, 0, 0.1) 0 2px 8px' });
+          break;
+        case 'chip':
+          shape = createShape('chip', { fill: '#e0e7ff', stroke: '#c7d2fe', strokeWidth: 1, left: 100, top: 100 });
+          break;
+        case 'avatar':
+          shape = createShape('avatar', { fill: '#6b7280', stroke: '#374151', strokeWidth: 2, left: 100, top: 100 });
+          break;
+        case 'notification':
+          shape = createShape('notification', { fill: '#ef4444', stroke: '#dc2626', strokeWidth: 1, left: 100, top: 100 });
+          break;
+        case 'statusOnline':
+          shape = createShape('statusOnline', { fill: '#22c55e', stroke: '#16a34a', strokeWidth: 1, left: 100, top: 100 });
+          break;
+        case 'statusOffline':
+          shape = createShape('statusOffline', { fill: '#6b7280', stroke: '#4b5563', strokeWidth: 1, left: 100, top: 100 });
+          break;
+        case 'statusAway':
+          shape = createShape('statusAway', { fill: '#f59e0b', stroke: '#d97706', strokeWidth: 1, left: 100, top: 100 });
+          break;
+        case 'radio':
+          shape = createShape('radio', { fill: 'white', stroke: '#d1d5db', strokeWidth: 2, left: 100, top: 100 });
+          break;
+        case 'radioSelected':
+          shape = new Group([
+            new Circle({
+              radius: 12,
+              fill: 'white',
+              stroke: '#3b82f6',
+              strokeWidth: 2,
+            }),
+            new Circle({
+              radius: 6,
+              fill: '#3b82f6',
+            })
+          ], {
             left: 100,
             top: 100,
-            fill: '#dc2626',
           });
+          break;
+        case 'checkbox':
+          shape = createShape('checkbox', { fill: 'white', stroke: '#d1d5db', strokeWidth: 2, left: 100, top: 100 });
+          break;
+        case 'checkboxChecked':
+          shape = new Group([
+            new Rect({
+              width: 20,
+              height: 20,
+              fill: '#3b82f6',
+              stroke: '#2563eb',
+              strokeWidth: 2,
+              rx: 4,
+              ry: 4,
+            })
+          ], {
+            left: 100,
+            top: 100,
+          });
+          break;
+        case 'tag':
+          shape = createShape('tag', { fill: '#f3f4f6', stroke: '#d1d5db', strokeWidth: 1, left: 100, top: 100 });
+          break;
+        case 'breadcrumb':
+          shape = createShape('breadcrumb', { fill: '#f3f4f6', stroke: '#d1d5db', strokeWidth: 1, left: 100, top: 100 });
+          break;
+        case 'step':
+          shape = createShape('step', { fill: '#3b82f6', left: 100, top: 100 });
+          break;
+        case 'loader':
+          shape = createShape('loader', baseOptions);
+          break;
+        case 'cloud':
+          shape = createPresetShape('cloud', { left: 100, top: 100 });
+          break;
+        case 'lightning':
+          shape = createPresetShape('lightning', { left: 100, top: 100 });
+          break;
+        case 'moon':
+          shape = createPresetShape('moon', { left: 100, top: 100 });
+          break;
+        case 'sun':
+          shape = createPresetShape('sun', { left: 100, top: 100 });
+          break;
+        case 'speech':
+          shape = createPresetShape('speech', { left: 100, top: 100 });
+          break;
+        case 'badge':
+          shape = createPresetShape('badge', { left: 100, top: 100 });
           break;
         case 'ribbon':
-          shape = new Polygon([
-            { x: -50, y: -20 }, { x: 50, y: -20 },
-            { x: 50, y: 20 }, { x: 30, y: 20 },
-            { x: 40, y: 35 }, { x: 20, y: 25 },
-            { x: 0, y: 35 }, { x: -20, y: 25 },
-            { x: -40, y: 35 }, { x: -30, y: 20 },
-            { x: -50, y: 20 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#7c3aed',
-          });
+          shape = createPresetShape('ribbon', { left: 100, top: 100 });
           break;
         case 'banner':
-          shape = new Polygon([
-            { x: -60, y: -25 }, { x: 40, y: -25 },
-            { x: 60, y: 0 }, { x: 40, y: 25 },
-            { x: -60, y: 25 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#059669',
-          });
+          shape = createPresetShape('banner', { left: 100, top: 100 });
           break;
         case 'frame':
-          shape = new Rect({
-            left: 100,
-            top: 100,
-            width: 120,
-            height: 120,
-            fill: 'transparent',
-            stroke: '#374151',
-            strokeWidth: 8,
-            rx: 15,
-            ry: 15,
-          });
+          shape = createPresetShape('frame', { left: 100, top: 100 });
           break;
         case 'burst':
-          const burstPoints = [];
-          for (let i = 0; i < 24; i++) {
-            const angle = (i * Math.PI) / 12;
-            const radius = i % 2 === 0 ? 50 : 25;
-            burstPoints.push({
-              x: Math.cos(angle) * radius,
-              y: Math.sin(angle) * radius
-            });
-          }
-          shape = new Polygon(burstPoints, {
-            left: 100,
-            top: 100,
-            fill: '#f59e0b',
-          });
+          shape = createPresetShape('burst', { left: 100, top: 100 });
           break;
         case 'shield':
-          shape = new Polygon([
-            { x: 0, y: -50 }, { x: 30, y: -40 },
-            { x: 40, y: -10 }, { x: 40, y: 20 },
-            { x: 30, y: 40 }, { x: 0, y: 50 },
-            { x: -30, y: 40 }, { x: -40, y: 20 },
-            { x: -40, y: -10 }, { x: -30, y: -40 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#1d4ed8',
-          });
+          shape = createPresetShape('shield', { left: 100, top: 100 });
           break;
         case 'flower':
-          const flowerPoints = [];
-          for (let i = 0; i < 8; i++) {
-            const angle = (i * Math.PI) / 4;
-            const radius = 40;
-            flowerPoints.push({
-              x: Math.cos(angle) * radius,
-              y: Math.sin(angle) * radius
-            });
-            const midAngle = angle + Math.PI / 8;
-            flowerPoints.push({
-              x: Math.cos(midAngle) * 15,
-              y: Math.sin(midAngle) * 15
-            });
-          }
-          shape = new Polygon(flowerPoints, {
-            left: 100,
-            top: 100,
-            fill: '#ec4899',
-          });
+          shape = createPresetShape('flower', { left: 100, top: 100 });
           break;
         case 'gear':
-          const gearPoints = [];
-          for (let i = 0; i < 16; i++) {
-            const angle = (i * Math.PI) / 8;
-            const radius = i % 2 === 0 ? 45 : 30;
-            gearPoints.push({
-              x: Math.cos(angle) * radius,
-              y: Math.sin(angle) * radius
-            });
-          }
-          shape = new Polygon(gearPoints, {
-            left: 100,
-            top: 100,
-            fill: '#6b7280',
-          });
+          shape = createPresetShape('gear', { left: 100, top: 100 });
           break;
         case 'leaf':
-          const leafPath = 'M50,100 Q25,75 25,50 Q25,25 50,0 Q75,25 75,50 Q75,75 50,100 Z';
-          shape = new Path(leafPath, {
-            left: 100,
-            top: 100,
-            fill: '#22c55e',
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('leaf', { left: 100, top: 100 });
           break;
         case 'crown':
-          shape = new Polygon([
-            { x: -40, y: 20 }, { x: -30, y: -10 },
-            { x: -15, y: 10 }, { x: 0, y: -20 },
-            { x: 15, y: 10 }, { x: 30, y: -10 },
-            { x: 40, y: 20 }, { x: 35, y: 30 },
-            { x: -35, y: 30 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#fbbf24',
-          });
+          shape = createPresetShape('crown', { left: 100, top: 100 });
           break;
         case 'butterfly':
-          const butterflyPath = 'M50,50 Q30,30 20,40 Q10,50 20,60 Q30,70 50,50 Q70,30 80,40 Q90,50 80,60 Q70,70 50,50 M50,30 Q45,20 50,10 Q55,20 50,30 M50,70 Q45,80 50,90 Q55,80 50,70';
-          shape = new Path(butterflyPath, {
-            left: 100,
-            top: 100,
-            fill: '#a855f7',
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('butterfly', { left: 100, top: 100 });
           break;
         case 'wave':
-          const wavePath = 'M0,50 Q25,25 50,50 T100,50 L100,75 Q75,100 50,75 T0,75 Z';
-          shape = new Path(wavePath, {
-            left: 100,
-            top: 100,
-            fill: '#06b6d4',
-            scaleX: 1.2,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('wave', { left: 100, top: 100 });
           break;
         case 'infinity':
-          const infinityPath = 'M25,50 Q0,25 25,25 Q50,25 50,50 Q50,75 25,75 Q0,75 25,50 Q50,25 75,25 Q100,25 75,50 Q50,75 75,75 Q100,75 75,50';
-          shape = new Path(infinityPath, {
-            left: 100,
-            top: 100,
-            fill: '#8b5cf6',
-            scaleX: 0.8,
-            scaleY: 0.6,
-          });
+          shape = createPresetShape('infinity', { left: 100, top: 100 });
           break;
         case 'spiral':
-          const spiralPath = 'M50,50 Q50,20 80,20 Q110,20 110,50 Q110,80 80,80 Q50,80 50,50 Q50,35 65,35 Q80,35 80,50 Q80,65 65,65 Q50,65 50,50';
-          shape = new Path(spiralPath, {
-            left: 100,
-            top: 100,
-            fill: '#f59e0b',
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('spiral', { left: 100, top: 100 });
           break;
         case 'sparkle':
-          const sparklePoints = [];
-          for (let i = 0; i < 12; i++) {
-            const angle = (i * Math.PI) / 6;
-            const radius = i % 2 === 0 ? 40 : 15;
-            sparklePoints.push({
-              x: Math.cos(angle) * radius,
-              y: Math.sin(angle) * radius
-            });
-          }
-          shape = new Polygon(sparklePoints, {
-            left: 100,
-            top: 100,
-            fill: '#fbbf24',
-          });
+          shape = createPresetShape('sparkle', { left: 100, top: 100 });
           break;
         case 'crescent':
-          const crescentPath = 'M50,10 A40,40 0 1,0 50,90 A30,30 0 1,1 50,10 Z';
-          shape = new Path(crescentPath, {
-            left: 100,
-            top: 100,
-            fill: '#fde047',
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('crescent', { left: 100, top: 100 });
           break;
         case 'teardrop':
-          const teardropPath = 'M50,10 Q30,30 30,60 Q30,80 50,80 Q70,80 70,60 Q70,30 50,10 Z';
-          shape = new Path(teardropPath, {
-            left: 100,
-            top: 100,
-            fill: '#06b6d4',
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('teardrop', { left: 100, top: 100 });
           break;
         case 'lens':
-          const lensPath = 'M50,10 Q30,30 30,50 Q30,70 50,90 Q70,70 70,50 Q70,30 50,10 Z';
-          shape = new Path(lensPath, {
-            left: 100,
-            top: 100,
-            fill: '#8b5cf6',
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('lens', { left: 100, top: 100 });
           break;
         case 'bracket':
-          shape = new Path('M20,20 L20,80 L40,80 L40,60 L60,60 L60,40 L40,40 L40,20 Z', {
-            left: 100,
-            top: 100,
-            fill: '#6b7280',
-            scaleX: 1.2,
-            scaleY: 1.2,
-          });
+          shape = createPresetShape('bracket', { left: 100, top: 100 });
           break;
         case 'chevron':
-          shape = new Polygon([
-            { x: -40, y: 0 }, { x: -20, y: -20 },
-            { x: 0, y: 0 }, { x: 20, y: -20 },
-            { x: 40, y: 0 }, { x: 20, y: 20 },
-            { x: 0, y: 0 }, { x: -20, y: 20 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#3b82f6',
-          });
+          shape = createPresetShape('chevron', { left: 100, top: 100 });
           break;
         case 'zigzag':
-          shape = new Path('M10,50 L30,20 L50,50 L70,20 L90,50 L110,20 L130,50', {
-            left: 100,
-            top: 100,
-            fill: 'transparent',
-            stroke: '#ef4444',
-            strokeWidth: 4,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('zigzag', { left: 100, top: 100 });
           break;
         case 'squiggle':
-          shape = new Path('M10,50 Q30,20 50,50 T90,50 T130,50', {
-            left: 100,
-            top: 100,
-            fill: 'transparent',
-            stroke: '#10b981',
-            strokeWidth: 4,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('squiggle', { left: 100, top: 100 });
           break;
         case 'callout':
           shape = new Polygon([
@@ -1681,52 +557,16 @@ case 'loader':
           });
           break;
         case 'arrowUp':
-          shape = new Polygon([
-            { x: 0, y: 30 }, { x: -20, y: 10 },
-            { x: -10, y: 10 }, { x: -10, y: -30 },
-            { x: 10, y: -30 }, { x: 10, y: 10 },
-            { x: 20, y: 10 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#22c55e',
-          });
+          shape = createPresetShape('arrowUp', { left: 100, top: 100 });
           break;
         case 'arrowDown':
-          shape = new Polygon([
-            { x: 0, y: -30 }, { x: -20, y: -10 },
-            { x: -10, y: -10 }, { x: -10, y: 30 },
-            { x: 10, y: 30 }, { x: 10, y: -10 },
-            { x: 20, y: -10 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#22c55e',
-          });
+          shape = createPresetShape('arrowDown', { left: 100, top: 100 });
           break;
         case 'arrowLeft':
-          shape = new Polygon([
-            { x: 30, y: 0 }, { x: 10, y: -20 },
-            { x: 10, y: -10 }, { x: -30, y: -10 },
-            { x: -30, y: 10 }, { x: 10, y: 10 },
-            { x: 10, y: 20 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#22c55e',
-          });
+          shape = createPresetShape('arrowLeft', { left: 100, top: 100 });
           break;
         case 'arrowRight':
-          shape = new Polygon([
-            { x: -30, y: 0 }, { x: -10, y: -20 },
-            { x: -10, y: -10 }, { x: 30, y: -10 },
-            { x: 30, y: 10 }, { x: -10, y: 10 },
-            { x: -10, y: 20 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#22c55e',
-          });
+          shape = createPresetShape('arrowRight', { left: 100, top: 100 });
           break;
         case 'doubleArrow':
           shape = new Group([
@@ -1748,50 +588,16 @@ case 'loader':
           });
           break;
         case 'curvedArrow':
-          const curvedArrowPath = 'M20,50 Q50,20 80,50 Q50,80 20,50 M70,40 L80,50 L70,60';
-          shape = new Path(curvedArrowPath, {
-            left: 100,
-            top: 100,
-            fill: 'transparent',
-            stroke: '#8b5cf6',
-            strokeWidth: 4,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('curvedArrow', { left: 100, top: 100 });
           break;
         case 'bentArrow':
-          shape = new Path('M20,50 L60,50 L60,30 L80,50 L60,70 L60,50', {
-            left: 100,
-            top: 100,
-            fill: 'transparent',
-            stroke: '#f59e0b',
-            strokeWidth: 4,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('bentArrow', { left: 100, top: 100 });
           break;
         case 'circularArrow':
-          const circularArrowPath = 'M50,10 A40,40 0 1,1 50,90 M70,70 L80,80 L70,90';
-          shape = new Path(circularArrowPath, {
-            left: 100,
-            top: 100,
-            fill: 'transparent',
-            stroke: '#ec4899',
-            strokeWidth: 4,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('circularArrow', { left: 100, top: 100 });
           break;
         case 'returnArrow':
-          shape = new Path('M20,50 L60,50 L60,30 L80,50 L60,70 L60,50 M20,50 L20,30 L40,30 L40,50', {
-            left: 100,
-            top: 100,
-            fill: 'transparent',
-            stroke: '#10b981',
-            strokeWidth: 4,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('returnArrow', { left: 100, top: 100 });
           break;
         case 'playButton':
           shape = new Polygon([
@@ -2343,138 +1149,37 @@ case 'loader':
           });
           break;
         case 'checkIcon':
-          shape = new Path('M20,50 L35,65 L70,30', {
-            left: 100,
-            top: 100,
-            fill: 'transparent',
-            stroke: '#22c55e',
-            strokeWidth: 4,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('checkIcon', { left: 100, top: 100 });
           break;
         case 'closeIcon':
-          shape = new Group([
-            new Line([30, 30, 60, 60], { stroke: '#ef4444', strokeWidth: 4 }),
-            new Line([60, 30, 30, 60], { stroke: '#ef4444', strokeWidth: 4 })
-          ], {
-            left: 100,
-            top: 100,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('closeIcon', { left: 100, top: 100 });
           break;
         case 'plusIcon':
-          shape = new Group([
-            new Line([40, 30, 40, 60], { stroke: '#22c55e', strokeWidth: 4 }),
-            new Line([30, 50, 60, 50], { stroke: '#22c55e', strokeWidth: 4 })
-          ], {
-            left: 100,
-            top: 100,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('plusIcon', { left: 100, top: 100 });
           break;
         case 'minusIcon':
-          shape = new Line([30, 50, 60, 50], {
-            left: 100,
-            top: 100,
-            stroke: '#ef4444',
-            strokeWidth: 4,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('minusIcon', { left: 100, top: 100 });
           break;
         case 'questionIcon':
-          shape = new Group([
-            new Circle({ radius: 20, fill: 'transparent', stroke: '#6b7280', strokeWidth: 3 }),
-            new Circle({ radius: 3, fill: '#6b7280', left: 47, top: 35 }),
-            new Path('M40,50 Q40,45 45,45 Q50,45 50,50 Q50,55 45,55', {
-              fill: 'transparent',
-              stroke: '#6b7280',
-              strokeWidth: 2
-            })
-          ], {
-            left: 100,
-            top: 100,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('questionIcon', { left: 100, top: 100 });
           break;
         case 'exclamationIcon':
-          shape = new Group([
-            new Line([50, 20, 50, 50], { stroke: '#f59e0b', strokeWidth: 4 }),
-            new Circle({ radius: 3, fill: '#f59e0b', left: 47, top: 55 })
-          ], {
-            left: 100,
-            top: 100,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('exclamationIcon', { left: 100, top: 100 });
           break;
         case 'infoIcon':
-          shape = new Group([
-            new Circle({ radius: 20, fill: 'transparent', stroke: '#3b82f6', strokeWidth: 3 }),
-            new Circle({ radius: 3, fill: '#3b82f6', left: 47, top: 35 }),
-            new Line([50, 45, 50, 55], { stroke: '#3b82f6', strokeWidth: 2 })
-          ], {
-            left: 100,
-            top: 100,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('infoIcon', { left: 100, top: 100 });
           break;
         case 'warningIcon':
-          shape = new Polygon([
-            { x: 50, y: 10 }, { x: 80, y: 70 },
-            { x: 20, y: 70 }
-          ], {
-            left: 100,
-            top: 100,
-            fill: '#f59e0b',
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('warningIcon', { left: 100, top: 100 });
           break;
         case 'errorIcon':
-          shape = new Group([
-            new Circle({ radius: 25, fill: '#ef4444' }),
-            new Line([35, 35, 65, 65], { stroke: 'white', strokeWidth: 4 }),
-            new Line([65, 35, 35, 65], { stroke: 'white', strokeWidth: 4 })
-          ], {
-            left: 100,
-            top: 100,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('errorIcon', { left: 100, top: 100 });
           break;
         case 'successIcon':
-          shape = new Group([
-            new Circle({ radius: 25, fill: '#22c55e' }),
-            new Path('M35,50 L45,60 L65,40', {
-              fill: 'transparent',
-              stroke: 'white',
-              strokeWidth: 4
-            })
-          ], {
-            left: 100,
-            top: 100,
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('successIcon', { left: 100, top: 100 });
           break;
         case 'loadingIcon':
-          shape = new Circle({
-            left: 100,
-            top: 100,
-            radius: 20,
-            fill: 'transparent',
-            stroke: '#3b82f6',
-            strokeWidth: 3,
-            strokeDashArray: [5, 5],
-            scaleX: 0.8,
-            scaleY: 0.8,
-          });
+          shape = createPresetShape('loadingIcon', { left: 100, top: 100 });
           break;
         case 'custom':
           // This will be handled by the custom shape creation tool
@@ -2505,9 +1210,13 @@ case 'loader':
             transparentCorners: false,
             cornerColor: '#4f46e5',
             borderColor: '#4f46e5',
-            borderScaleFactor: 2
+            borderScaleFactor: 2,
+            selectable: true,
+            evented: true
           });
           canvas.add(img);
+          // Ensure new image sits above any background image
+          canvas.bringObjectToFront(img);
           canvas.setActiveObject(img);
           canvas.renderAll();
           updateLayers();
@@ -2516,6 +1225,8 @@ case 'loader':
         });
       };
       reader.readAsDataURL(file);
+      // Reset input so the same file can be uploaded again
+      e.target.value = '';
     }
   };
 
@@ -2685,6 +1396,8 @@ const backgroundColors = [
         });
       };
       reader.readAsDataURL(file);
+      // Reset input so the same file can be uploaded again
+      e.target.value = '';
     }
   };
 
@@ -3106,30 +1819,13 @@ const backgroundColors = [
               <div className="space-y-3 mt-6">
                 <h4 className="font-semibold text-sm text-slate-700 dark:text-slate-300">Text Spacing</h4>
                 <div className="space-y-2">
-                  <Button onClick={() => addSpacedText('ultra-tight')} variant="outline" className="w-full h-12 justify-start">
-                    <span className="text-sm" style={{letterSpacing: '-0.15em'}}>Ultra Tight</span>
-                  </Button>
-                  <Button onClick={() => addSpacedText('condensed')} variant="outline" className="w-full h-12 justify-start">
-                    <span className="text-sm" style={{letterSpacing: '-0.1em'}}>Condensed</span>
-                  </Button>
-                  <Button onClick={() => addSpacedText('tight')} variant="outline" className="w-full h-12 justify-start">
-                    <span className="text-sm" style={{letterSpacing: '-0.05em'}}>Tight Spacing</span>
-                  </Button>
-                  <Button onClick={() => addSpacedText('normal')} variant="outline" className="w-full h-12 justify-start">
-                    <span className="text-sm">Normal Spacing</span>
-                  </Button>
-                  <Button onClick={() => addSpacedText('wide')} variant="outline" className="w-full h-12 justify-start">
-                    <span className="text-sm" style={{letterSpacing: '0.1em'}}>Wide Spacing</span>
-                  </Button>
-                  <Button onClick={() => addSpacedText('extra-wide')} variant="outline" className="w-full h-12 justify-start">
-                    <span className="text-sm" style={{letterSpacing: '0.2em'}}>Extra Wide</span>
-                  </Button>
-                  <Button onClick={() => addSpacedText('ultra-wide')} variant="outline" className="w-full h-12 justify-start">
-                    <span className="text-sm" style={{letterSpacing: '0.3em'}}>Ultra Wide</span>
-                  </Button>
-                  <Button onClick={() => addSpacedText('mega-wide')} variant="outline" className="w-full h-12 justify-start">
-                    <span className="text-sm" style={{letterSpacing: '0.4em'}}>Mega Wide</span>
-                  </Button>
+                  {textSpacingPresets.map(preset => (
+                    <Button key={preset.name} onClick={() => addSpacedText(preset.name)} variant="outline" className="w-full h-12 justify-start">
+                      <span className="text-sm" style={{letterSpacing: preset.value < 0 ? `${preset.value/100}em` : `${preset.value/1000}em`}}>
+                        {preset.label}
+                      </span>
+                    </Button>
+                  ))}
                 </div>
               </div>
             </TabsContent>

@@ -1,117 +1,192 @@
 export const canvaTemplates = [
   // INSTAGRAM ADS - Elegant, Aesthetic, Pastel
-  {
-    "title": "Instagram Fashion Ad - Pastel Dream",
-    "category": "Instagram Ads",
-    "filename": "instagram_fashion_pastel.json",
-    "json": {
-      "version": "5.3.0",
-      "objects": [
-        {
-          "type": "rect",
-          "left": 0,
-          "top": 0,
-          "width": 1080,
-          "height": 1080,
-          "fill": {
-            "type": "linear",
-            "coords": { "x1": 0, "y1": 0, "x2": 1080, "y2": 1080 },
-            "colorStops": [
-              { "offset": 0, "color": "#f8e8ff" },
-              { "offset": 0.5, "color": "#e8d5ff" },
-              { "offset": 1, "color": "#d4c5f1" }
-            ]
-          },
-          "selectable": false
+ {
+  "title": "Instagram Fashion Ad - Luxury Essence",
+  "category": "Instagram Ads",
+  "filename": "instagram_fashion_luxury.json",
+  "json": {
+    "version": "5.3.0",
+    "objects": [
+      {
+        "type": "image",
+        "left": 0,
+        "top": 0,
+        "width": 1080,
+        "height": 1080,
+        "src": "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=1080&h=1080&fit=crop",
+        "selectable": false
+      },
+      {
+        "type": "rect",
+        "left": 0,
+        "top": 0,
+        "width": 1080,
+        "height": 1080,
+        "fill": {
+          "type": "linear",
+          "coords": { "x1": 0, "y1": 0, "x2": 0, "y2": 1080 },
+          "colorStops": [
+            { "offset": 0, "color": "rgba(10, 10, 10, 0.75)" },
+            { "offset": 0.3, "color": "rgba(26, 26, 46, 0.8)" },
+            { "offset": 0.7, "color": "rgba(22, 33, 62, 0.85)" },
+            { "offset": 1, "color": "rgba(15, 52, 96, 0.9)" }
+          ]
         },
-        {
-          "type": "circle",
-          "left": 200,
-          "top": 150,
-          "radius": 120,
-          "fill": "rgba(255, 255, 255, 0.3)",
-          "stroke": "rgba(255, 255, 255, 0.5)",
-          "strokeWidth": 2
-        },
-        {
-          "type": "circle",
-          "left": 760,
-          "top": 200,
-          "radius": 80,
-          "fill": "rgba(255, 182, 193, 0.4)",
-          "stroke": "rgba(255, 182, 193, 0.6)",
-          "strokeWidth": 2
-        },
-        {
-          "type": "image",
-          "left": 340,
-          "top": 200,
-          "width": 400,
-          "height": 500,
-          "src": "https://images.unsplash.com/photo-1441986300917-64674bd600d8?w=400&h=500&fit=crop",
-          "cropX": 0,
-          "cropY": 0,
-          "rx": 20,
-          "ry": 20,
-          "shadow": {
-            "color": "rgba(0, 0, 0, 0.1)",
-            "blur": 20,
-            "offsetX": 0,
-            "offsetY": 10
-          },
-          "name": "Product Image",
-          "isTemplateImage": true
-        },
-        {
-          "type": "textbox",
-          "left": 50,
-          "top": 750,
-          "width": 980,
-          "text": "NEW COLLECTION",
-          "fontSize": 36,
-          "fontFamily": "Playfair Display",
-          "fontWeight": "bold",
-          "fill": "#8b5a96",
-          "textAlign": "center",
-          "charSpacing": 8,
-          "name": "Main Headline",
-          "isTemplateText": true
-        },
-        {
-          "type": "textbox",
-          "left": 50,
-          "top": 800,
-          "width": 980,
-          "text": "Elegant • Modern • Timeless",
-          "fontSize": 20,
-          "fontFamily": "Inter",
-          "fill": "#a67bb8",
-          "textAlign": "center",
-          "charSpacing": 2,
-          "name": "Subtitle",
-          "isTemplateText": true
-        },
-        {
-          "type": "textbox",
-          "left": 50,
-          "top": 850,
-          "width": 980,
-          "text": "Shop Now",
-          "fontSize": 24,
-          "fontFamily": "Inter",
-          "fontWeight": "bold",
-          "fill": "#ffffff",
-          "textAlign": "center",
-          "backgroundColor": "#8b5a96",
-          "padding": 15,
-          "rx": 25,
-          "ry": 25,
-          "name": "CTA Button",
-          "isTemplateText": true
+        "selectable": false
+      },
+      {
+        "type": "circle",
+        "left": 750,
+        "top": 80,
+        "radius": 250,
+        "fill": "rgba(218, 165, 32, 0.08)",
+        "stroke": "rgba(218, 165, 32, 0.25)",
+        "strokeWidth": 1
+      },
+      {
+        "type": "circle",
+        "left": 100,
+        "top": 750,
+        "radius": 180,
+        "fill": "rgba(255, 215, 0, 0.06)",
+        "stroke": "rgba(255, 215, 0, 0.2)",
+        "strokeWidth": 1
+      },
+      {
+        "type": "rect",
+        "left": 120,
+        "top": 240,
+        "width": 840,
+        "height": 600,
+        "fill": "rgba(10, 10, 10, 0.65)",
+        "rx": 24,
+        "ry": 24,
+        "stroke": "rgba(218, 165, 32, 0.35)",
+        "strokeWidth": 1.5,
+        "shadow": {
+          "color": "rgba(218, 165, 32, 0.2)",
+          "blur": 50,
+          "offsetX": 0,
+          "offsetY": 25
         }
-      ]
-    }
-  },
+      },
+      {
+        "type": "line",
+        "left": 540,
+        "top": 100,
+        "x1": 0,
+        "y1": 0,
+        "x2": 0,
+        "y2": 80,
+        "stroke": "rgba(218, 165, 32, 0.7)",
+        "strokeWidth": 2
+      },
+      {
+        "type": "textbox",
+        "left": 460,
+        "top": 60,
+        "width": 160,
+        "text": "2024",
+        "fontSize": 16,
+        "fontFamily": "Inter",
+        "fontWeight": "300",
+        "fill": "#DAA520",
+        "textAlign": "center",
+        "charSpacing": 8
+      },
+      {
+        "type": "textbox",
+        "left": 180,
+        "top": 330,
+        "width": 720,
+        "text": "elegance",
+        "fontSize": 80,
+        "fontFamily": "Playfair Display",
+        "fontWeight": "400",
+        "fill": "#E8E8E8",
+        "textAlign": "center",
+        "lineHeight": 1.2
+      },
+      {
+        "type": "textbox",
+        "left": 180,
+        "top": 440,
+        "width": 720,
+        "text": "REDEFINED",
+        "fontSize": 70,
+        "fontFamily": "Montserrat",
+        "fontWeight": "700",
+        "fill": "#DAA520",
+        "textAlign": "center",
+        "charSpacing": 120
+      },
+      {
+        "type": "rect",
+        "left": 440,
+        "top": 570,
+        "width": 200,
+        "height": 2,
+        "fill": "#DAA520"
+      },
+      {
+        "type": "textbox",
+        "left": 180,
+        "top": 625,
+        "width": 720,
+        "text": "Crafted for the discerning few",
+        "fontSize": 24,
+        "fontFamily": "Inter",
+        "fontWeight": "300",
+        "fill": "#C0C0C0",
+        "textAlign": "center",
+        "lineHeight": 1.5,
+        "charSpacing": 2
+      },
+      {
+        "type": "rect",
+        "left": 340,
+        "top": 720,
+        "width": 400,
+        "height": 70,
+        "fill": "#DAA520",
+        "rx": 35,
+        "ry": 35,
+        "shadow": {
+          "color": "rgba(218, 165, 32, 0.4)",
+          "blur": 20,
+          "offsetX": 0,
+          "offsetY": 10
+        }
+      },
+      {
+        "type": "textbox",
+        "left": 340,
+        "top": 737,
+        "width": 400,
+        "text": "explore collection",
+        "fontSize": 20,
+        "fontFamily": "Poppins",
+        "fontWeight": "600",
+        "fill": "#0A0A0A",
+        "textAlign": "center",
+        "charSpacing": 80
+      },
+      {
+        "type": "textbox",
+        "left": 120,
+        "top": 900,
+        "width": 840,
+        "text": "@luxuryessence • haute couture",
+        "fontSize": 18,
+        "fontFamily": "Inter",
+        "fontWeight": "400",
+        "fill": "#B8A080",
+        "textAlign": "center",
+        "charSpacing": 3
+      }
+    ]
+  }
+},
   {
     "title": "Instagram Beauty Ad - Soft Glow",
     "category": "Instagram Ads",
@@ -326,6 +401,48 @@ export const canvaTemplates = [
           "name": "Main Headline",
           "isTemplateText": true
         },
+        {
+          "type": "textbox",
+          "left": 50,
+          "top": 660,
+          "width": 980,
+          "text": "Timeless elegance meets modern comfort",
+          "fontSize": 20,
+          "fontFamily": "Inter",
+          "fill": "#666666",
+          "textAlign": "center",
+          "charSpacing": 1,
+          "name": "Subtitle",
+          "isTemplateText": true
+        },
+        {
+          "type": "textbox",
+          "left": 50,
+          "top": 720,
+          "width": 980,
+          "text": "Explore Collection",
+          "fontSize": 24,
+          "fontFamily": "Inter",
+          "fontWeight": "bold",
+          "fill": "#ffffff",
+          "textAlign": "center",
+          "backgroundColor": "#2c2c2c",
+          "padding": 16,
+          "rx": 8,
+          "ry": 8,
+          "name": "CTA Button",
+          "isTemplateText": true
+        }
+      ]
+    }
+  },
+  {
+    "title": "Recovered Template",
+    "category": "Recovered",
+    "filename": "recovered_template.json",
+    "json": {
+      "version": "5.3.0",
+      "objects": [
         {
           "type": "textbox",
           "left": 50,

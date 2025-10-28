@@ -1,11 +1,134 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect, ReactNode } from 'react';
 import { toast } from 'sonner';
-import { Group, Rect, Circle, Text, FabricImage } from 'fabric';
+import { Group, Rect, Circle, Text, FabricImage, Path, Canvas as FabricCanvas, FabricObject } from 'fabric';
 import * as fabric from 'fabric';
 
-const EditorContext = createContext(null);
+interface CanvasSize {
+  width: number;
+  height: number;
+}
 
-export const useEditor = () => {
+interface Filters {
+  brightness: number;
+  contrast: number;
+  saturation: number;
+  blur: number;
+}
+
+interface Layer {
+  id: string;
+  name: string;
+  type: string;
+  visible: boolean;
+  locked: boolean;
+  index: number;
+  parentId: string | null;
+  isGroup: boolean;
+  children: Layer[];
+}
+
+interface Board {
+  id: number;
+  name: string;
+  data: any;
+}
+
+interface FilterPreset {
+  name: string;
+  filters: Array<{
+    type: string;
+    value?: number;
+  }>;
+}
+
+interface EditorContextType {
+  canvas: FabricCanvas | null;
+  setCanvas: (canvas: FabricCanvas | null) => void;
+  canvasRef: React.RefObject<HTMLCanvasElement>;
+  activeObject: FabricObject | null;
+  setActiveObject: (obj: FabricObject | null) => void;
+  zoom: number;
+  setZoom: (zoom: number) => void;
+  canvasSize: CanvasSize;
+  setCanvasSize: (size: CanvasSize) => void;
+  backgroundColor: string;
+  setBackgroundColor: (color: string) => void;
+  history: any[];
+  historyStep: number;
+  saveToHistory: () => void;
+  undo: () => void;
+  redo: () => void;
+  layers: Layer[];
+  updateLayers: () => void;
+  selectedTemplate: any;
+  setSelectedTemplate: (template: any) => void;
+  isDarkMode: boolean;
+  setIsDarkMode: (dark: boolean) => void;
+  showGrid: boolean;
+  setShowGrid: (show: boolean) => void;
+  copyObject: () => void;
+  pasteObject: () => void;
+  deleteObject: () => void;
+  bringForward: () => void;
+  sendBackward: () => void;
+  clipboardObject: FabricObject | null;
+  isLoading: boolean;
+  setIsLoading: (loading: boolean) => void;
+  filters: Filters;
+  setFilters: (filters: Filters) => void;
+  exportCanvas: (format?: string, quality?: number) => string | undefined;
+  duplicateObject: () => void;
+  centerObject: () => void;
+  resetCanvas: () => void;
+  boards: Board[];
+  activeBoard: number;
+  createBoard: () => void;
+  switchBoard: (boardId: number) => void;
+  closeBoard: (boardId: number) => void;
+  duplicateBoard: (boardId: number) => void;
+  rotateCanvas: (direction: 'left' | 'right') => void;
+  canvasRotation: number;
+  groupObjects: () => void;
+  ungroupObjects: () => void;
+  selectedLayers: string[];
+  selectLayer: (layerId: string) => void;
+  selectAllLayers: () => void;
+  clearLayerSelection: () => void;
+  groupSelectedLayers: () => void;
+  expandedGroups: Set<string>;
+  toggleGroupExpansion: (groupId: string) => void;
+  ungroupLayer: (layerId: string) => void;
+  cropImage: () => void;
+  applyCrop: () => void;
+  maskWithShape: (shape: string) => void;
+  maskWithText: (text: string) => void;
+  removeMask: () => void;
+  maskImageWithCustomShape: () => void;
+  fillShapeWithImage: () => void;
+  resizeCanvas: (width: number, height: number) => void;
+  moveLayerUp: (layerId: string) => void;
+  moveLayerDown: (layerId: string) => void;
+  moveLayerToTop: (layerId: string) => void;
+  moveLayerToBottom: (layerId: string) => void;
+  isDrawingCustom: boolean;
+  setIsDrawingCustom: (drawing: boolean) => void;
+  customPath: Array<{x: number, y: number}>;
+  setCustomPath: (path: Array<{x: number, y: number}>) => void;
+  applyFilterPreset: (preset: FilterPreset) => void;
+  removeFilters: () => void;
+  activeFilterPreset: FilterPreset | null;
+  setActiveFilterPreset: (preset: FilterPreset | null) => void;
+  templateContrast: number;
+  setTemplateContrast: (contrast: number) => void;
+  backgroundOpacity: number;
+  setBackgroundOpacity: (opacity: number) => void;
+  applyTemplateContrast: (contrast: number) => void;
+  applyBackgroundOpacity: (opacity: number) => void;
+}
+
+const EditorContext = createContext<EditorContextType | null>(null);
+
+export const useEditor = (): EditorContextType => {
   const context = useContext(EditorContext);
   if (!context) {
     throw new Error('useEditor must be used within EditorProvider');
@@ -13,37 +136,43 @@ export const useEditor = () => {
   return context;
 };
 
-export const EditorProvider = ({ children }) => {
-  const [canvas, setCanvas] = useState(null);
-  const [activeObject, setActiveObject] = useState(null);
-  const [zoom, setZoom] = useState(100);
-  const [canvasSize, setCanvasSize] = useState({ width: 1080, height: 1080 });
-  const [backgroundColor, setBackgroundColor] = useState('#ffffff');
-  const [history, setHistory] = useState([]);
-  const [historyStep, setHistoryStep] = useState(-1);
-  const [layers, setLayers] = useState([]);
-  const [selectedLayers, setSelectedLayers] = useState([]);
-  const [expandedGroups, setExpandedGroups] = useState(new Set());
-  const [selectedTemplate, setSelectedTemplate] = useState(null);
-  const [isDarkMode, setIsDarkMode] = useState(false);
-  const [showGrid, setShowGrid] = useState(false);
-  const [clipboardObject, setClipboardObject] = useState(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [filters, setFilters] = useState({
+interface EditorProviderProps {
+  children: ReactNode;
+}
+
+export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
+  const [canvas, setCanvas] = useState<FabricCanvas | null>(null);
+  const [activeObject, setActiveObject] = useState<FabricObject | null>(null);
+  const [zoom, setZoom] = useState<number>(100);
+  const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 1080, height: 1080 });
+  const [backgroundColor, setBackgroundColor] = useState<string>('#ffffff');
+  const [history, setHistory] = useState<any[]>([]);
+  const [historyStep, setHistoryStep] = useState<number>(-1);
+  const [layers, setLayers] = useState<Layer[]>([]);
+  const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
+  const [isDarkMode, setIsDarkMode] = useState<boolean>(false);
+  const [showGrid, setShowGrid] = useState<boolean>(false);
+  const [clipboardObject, setClipboardObject] = useState<FabricObject | null>(null);
+  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [filters, setFilters] = useState<Filters>({
     brightness: 0,
     contrast: 0,
     saturation: 0,
     blur: 0
   });
-  const [boards, setBoards] = useState([{ id: 1, name: 'Board 1', data: null }]);
-  const [activeBoard, setActiveBoard] = useState(1);
-  const [canvasRotation, setCanvasRotation] = useState(0);
-  const canvasRef = useRef(null);
-  const boardDataRef = useRef({});
-  const isInitialized = useRef(false);
-  const [isDrawingCustom, setIsDrawingCustom] = useState(false);
-  const [customPath, setCustomPath] = useState([]);
-
+  const [activeFilterPreset, setActiveFilterPreset] = useState<FilterPreset | null>(null);
+  const [templateContrast, setTemplateContrast] = useState<number>(0);
+  const [backgroundOpacity, setBackgroundOpacity] = useState<number>(100);
+  const [boards, setBoards] = useState<Board[]>([{ id: 1, name: 'Board 1', data: null }]);
+  const [activeBoard, setActiveBoard] = useState<number>(1);
+  const [canvasRotation, setCanvasRotation] = useState<number>(0);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const boardDataRef = useRef<Record<number, any>>({});
+  const isInitialized = useRef<boolean>(false);
+  const [isDrawingCustom, setIsDrawingCustom] = useState<boolean>(false);
+  const [customPath, setCustomPath] = useState<Array<{x: number, y: number}>>([]);
   // Initialize history when canvas is first set
   useEffect(() => {
     if (canvas && !isInitialized.current) {
@@ -58,26 +187,26 @@ export const EditorProvider = ({ children }) => {
   const updateLayers = useCallback(() => {
     if (canvas) {
       const objects = canvas.getObjects();
-      const layerList = [];
+      const layerList: Layer[] = [];
       
-      const processObject = (obj, index, parentId = null) => {
+      const processObject = (obj: FabricObject, index: number, parentId: string | null = null): Layer => {
         const layerId = `layer-${objects.length - 1 - index}`;
-        const layer = {
+        const layer: Layer = {
           id: layerId,
-          name: obj.name || (obj.type === 'textbox' ? obj.text?.substring(0, 20) + '...' : obj.type) || 'Layer',
-          type: obj.type,
-          visible: obj.visible !== false,
-          locked: obj.selectable === false,
+          name: (obj as any).name || (obj.type === 'textbox' ? (obj as any).text?.substring(0, 20) + '...' : obj.type) || 'Layer',
+          type: obj.type || 'object',
+          visible: (obj as any).visible !== false,
+          locked: (obj as any).selectable === false,
           index: objects.length - 1 - index,
           parentId: parentId,
           isGroup: obj.type === 'group',
           children: []
         };
         
-        if (obj.type === 'group' && obj.getObjects) {
+        if (obj.type === 'group' && (obj as any).getObjects) {
           // Process children of the group
-          const groupObjects = obj.getObjects();
-          groupObjects.forEach((childObj, childIndex) => {
+          const groupObjects = (obj as any).getObjects();
+          groupObjects.forEach((childObj: FabricObject, childIndex: number) => {
             const childLayer = processObject(childObj, index, layerId);
             layer.children.push(childLayer);
           });
@@ -121,7 +250,7 @@ export const EditorProvider = ({ children }) => {
         setActiveObject(activeObj);
       });
     }
-  }, [canvas, history, historyStep, updateLayers, setActiveObject]);
+  }, [canvas, history, historyStep, updateLayers]);
 
   const redo = useCallback(() => {
     if (historyStep < history.length - 1 && canvas) {
@@ -139,7 +268,7 @@ export const EditorProvider = ({ children }) => {
         });
       }
     }
-  }, [canvas, history, historyStep, updateLayers, setActiveObject]);
+  }, [canvas, history, historyStep, updateLayers]);
 
   const copyObject = useCallback(() => {
     if (activeObject) {
@@ -151,17 +280,18 @@ export const EditorProvider = ({ children }) => {
     if (clipboardObject && canvas) {
       try {
         const objectData = clipboardObject.toObject();
-        fabric.util.enlivenObjects([objectData], (objects) => {
+        const callback = (objects: FabricObject[]) => {
           const cloned = objects[0];
           cloned.set({
-            left: cloned.left + 20,
-            top: cloned.top + 20,
+            left: (cloned.left || 0) + 20,
+            top: (cloned.top || 0) + 20,
           });
           canvas.add(cloned);
           canvas.setActiveObject(cloned);
           canvas.renderAll();
           saveToHistory();
-        });
+        };
+        (fabric.util.enlivenObjects as any)([objectData], callback);
       } catch (error) {
         console.error('Paste failed:', error);
         toast.error('Failed to paste object');
@@ -177,12 +307,12 @@ export const EditorProvider = ({ children }) => {
     }
   }, [activeObject, canvas, saveToHistory]);
   
-  const exportCanvas = useCallback((format = 'png', quality = 1) => {
+  const exportCanvas = useCallback((format: string = 'png', quality: number = 1): string | undefined => {
     if (canvas) {
       setIsLoading(true);
       try {
         const dataURL = canvas.toDataURL({
-          format: format,
+          format: format as any,
           quality: quality,
           multiplier: 2 // Higher resolution export
         });
@@ -206,17 +336,18 @@ export const EditorProvider = ({ children }) => {
     if (activeObject && canvas) {
       try {
         const objectData = activeObject.toObject();
-        fabric.util.enlivenObjects([objectData], (objects) => {
+        const callback = (objects: FabricObject[]) => {
           const cloned = objects[0];
           cloned.set({
-            left: cloned.left + 20,
-            top: cloned.top + 20,
+            left: (cloned.left || 0) + 20,
+            top: (cloned.top || 0) + 20,
           });
           canvas.add(cloned);
           canvas.setActiveObject(cloned);
           canvas.renderAll();
           saveToHistory();
-        });
+        };
+        (fabric.util.enlivenObjects as any)([objectData], callback);
       } catch (error) {
         console.error('Duplicate failed:', error);
         toast.error('Failed to duplicate object');
@@ -226,7 +357,7 @@ export const EditorProvider = ({ children }) => {
   
   const centerObject = useCallback(() => {
     if (activeObject && canvas) {
-      activeObject.center();
+      (activeObject as any).center();
       canvas.renderAll();
       saveToHistory();
     }
@@ -242,7 +373,7 @@ export const EditorProvider = ({ children }) => {
     }
   }, [canvas, saveToHistory]);
 
-  const switchBoard = useCallback((boardId) => {
+  const switchBoard = useCallback((boardId: number) => {
     if (canvas && activeBoard !== boardId) {
       // Save current board data
       boardDataRef.current[activeBoard] = {
@@ -284,12 +415,12 @@ export const EditorProvider = ({ children }) => {
 
   const createBoard = useCallback(() => {
     const newId = Math.max(...boards.map(b => b.id)) + 1;
-    const newBoard = { id: newId, name: `Board ${newId}`, data: null };
+    const newBoard: Board = { id: newId, name: `Board ${newId}`, data: null };
     setBoards(prev => [...prev, newBoard]);
     switchBoard(newId);
   }, [boards, switchBoard]);
 
-  const closeBoard = useCallback((boardId) => {
+  const closeBoard = useCallback((boardId: number) => {
     if (boards.length > 1) {
       setBoards(prev => prev.filter(b => b.id !== boardId));
       delete boardDataRef.current[boardId];
@@ -301,11 +432,11 @@ export const EditorProvider = ({ children }) => {
     }
   }, [boards, activeBoard, switchBoard]);
 
-  const duplicateBoard = useCallback((boardId) => {
+  const duplicateBoard = useCallback((boardId: number) => {
     const boardToDuplicate = boards.find(b => b.id === boardId);
     if (boardToDuplicate && canvas) {
       const newId = Math.max(...boards.map(b => b.id)) + 1;
-      const newBoard = { id: newId, name: `${boardToDuplicate.name} Copy`, data: null };
+      const newBoard: Board = { id: newId, name: `${boardToDuplicate.name} Copy`, data: null };
       
       // If duplicating the currently active board, use current canvas state
       if (boardId === activeBoard) {
@@ -324,7 +455,7 @@ export const EditorProvider = ({ children }) => {
             json: JSON.parse(JSON.stringify(sourceBoardData.json)),
             backgroundColor: sourceBoardData.backgroundColor,
             canvasSize: { ...sourceBoardData.canvasSize },
-            history: sourceBoardData.history.map(h => JSON.parse(JSON.stringify(h))),
+            history: sourceBoardData.history.map((h: any) => JSON.parse(JSON.stringify(h))),
             historyStep: sourceBoardData.historyStep
           };
         }
@@ -337,7 +468,7 @@ export const EditorProvider = ({ children }) => {
 
   const bringForward = useCallback(() => {
     if (activeObject && canvas) {
-      canvas.bringForward(activeObject);
+      (canvas as any).bringForward(activeObject);
       canvas.renderAll();
       updateLayers();
       saveToHistory();
@@ -346,14 +477,13 @@ export const EditorProvider = ({ children }) => {
 
   const sendBackward = useCallback(() => {
     if (activeObject && canvas) {
-      canvas.sendBackwards(activeObject);
+      (canvas as any).sendBackwards(activeObject);
       canvas.renderAll();
       updateLayers();
       saveToHistory();
     }
   }, [activeObject, canvas, updateLayers, saveToHistory]);
-
-  const resizeCanvas = useCallback((newWidth, newHeight) => {
+  const resizeCanvas = useCallback((newWidth: number, newHeight: number) => {
     if (!canvas) return;
     
     const scaleX = newWidth / canvasSize.width;
@@ -362,10 +492,10 @@ export const EditorProvider = ({ children }) => {
     // Scale all objects to fit new canvas dimensions
     canvas.getObjects().forEach(obj => {
       obj.set({
-        left: obj.left * scaleX,
-        top: obj.top * scaleY,
-        scaleX: obj.scaleX * scaleX,
-        scaleY: obj.scaleY * scaleY
+        left: (obj.left || 0) * scaleX,
+        top: (obj.top || 0) * scaleY,
+        scaleX: (obj.scaleX || 1) * scaleX,
+        scaleY: (obj.scaleY || 1) * scaleY
       });
       obj.setCoords();
     });
@@ -376,9 +506,9 @@ export const EditorProvider = ({ children }) => {
     canvas.renderAll();
     updateLayers();
     saveToHistory();
-  }, [canvas, canvasSize, setCanvasSize, updateLayers, saveToHistory]);
+  }, [canvas, canvasSize, updateLayers, saveToHistory]);
 
-  const rotateCanvas = useCallback((direction) => {
+  const rotateCanvas = useCallback((direction: 'left' | 'right') => {
     if (!canvas) return;
     
     const rotation = direction === 'left' ? -90 : 90;
@@ -394,7 +524,7 @@ export const EditorProvider = ({ children }) => {
     saveToHistory();
   }, [canvas, canvasRotation, canvasSize, saveToHistory, resizeCanvas]);
 
-  const selectLayer = useCallback((layerId) => {
+  const selectLayer = useCallback((layerId: string) => {
     setSelectedLayers(prev => {
       if (prev.includes(layerId)) {
         return prev.filter(id => id !== layerId);
@@ -412,7 +542,7 @@ export const EditorProvider = ({ children }) => {
     setSelectedLayers([]);
   }, []);
 
-  const toggleGroupExpansion = useCallback((groupId) => {
+  const toggleGroupExpansion = useCallback((groupId: string) => {
     setExpandedGroups(prev => {
       const newSet = new Set(prev);
       if (newSet.has(groupId)) {
@@ -423,7 +553,8 @@ export const EditorProvider = ({ children }) => {
       return newSet;
     });
   }, []);
-const groupSelectedLayers = useCallback(() => {
+
+  const groupSelectedLayers = useCallback(() => {
     if (!canvas || selectedLayers.length < 2) return;
     
     const objects = canvas.getObjects();
@@ -447,25 +578,23 @@ const groupSelectedLayers = useCallback(() => {
       updateLayers();
       saveToHistory();
       clearLayerSelection();
-
     }
   }, [canvas, selectedLayers, layers, updateLayers, saveToHistory, clearLayerSelection]);
 
   const ungroupObjects = useCallback(() => {
     if (!canvas) return;
-    const activeObject = canvas.getActiveObject();
-    if (activeObject && activeObject.type === 'group') {
-      const objects = activeObject.getObjects();
-      canvas.remove(activeObject);
-      objects.forEach(obj => canvas.add(obj));
+    const activeObj = canvas.getActiveObject();
+    if (activeObj && activeObj.type === 'group') {
+      const objects = (activeObj as any).getObjects();
+      canvas.remove(activeObj);
+      objects.forEach((obj: FabricObject) => canvas.add(obj));
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
-
     }
   }, [canvas, updateLayers, saveToHistory]);
 
-  const ungroupLayer = useCallback((layerId) => {
+  const ungroupLayer = useCallback((layerId: string) => {
     if (!canvas) return;
     
     const objects = canvas.getObjects();
@@ -473,18 +602,16 @@ const groupSelectedLayers = useCallback(() => {
     const obj = objects[objects.length - 1 - layerIndex];
     
     if (obj && obj.type === 'group') {
-      const groupObjects = obj.getObjects();
+      const groupObjects = (obj as any).getObjects();
       canvas.remove(obj);
-      groupObjects.forEach(groupObj => canvas.add(groupObj));
+      groupObjects.forEach((groupObj: FabricObject) => canvas.add(groupObj));
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
       clearLayerSelection();
-
     }
   }, [canvas, layers, updateLayers, saveToHistory, clearLayerSelection]);
-
-  const moveLayerUp = useCallback((layerId) => {
+  const moveLayerUp = useCallback((layerId: string) => {
     if (!canvas) return;
     
     const objects = canvas.getObjects();
@@ -493,14 +620,14 @@ const groupSelectedLayers = useCallback(() => {
     const obj = objects[objectIndex];
     
     if (obj && objectIndex < objects.length - 1) {
-      canvas.bringForward(obj);
+      (canvas as any).bringForward(obj);
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
     }
   }, [canvas, layers, updateLayers, saveToHistory]);
 
-  const moveLayerDown = useCallback((layerId) => {
+  const moveLayerDown = useCallback((layerId: string) => {
     if (!canvas) return;
     
     const objects = canvas.getObjects();
@@ -509,14 +636,14 @@ const groupSelectedLayers = useCallback(() => {
     const obj = objects[objectIndex];
     
     if (obj && objectIndex > 0) {
-      canvas.sendBackwards(obj);
+      (canvas as any).sendBackwards(obj);
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
     }
   }, [canvas, layers, updateLayers, saveToHistory]);
 
-  const moveLayerToTop = useCallback((layerId) => {
+  const moveLayerToTop = useCallback((layerId: string) => {
     if (!canvas) return;
     
     const objects = canvas.getObjects();
@@ -524,14 +651,14 @@ const groupSelectedLayers = useCallback(() => {
     const obj = objects[objects.length - 1 - layerIndex];
     
     if (obj) {
-      canvas.bringToFront(obj);
+      (canvas as any).bringToFront(obj);
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
     }
   }, [canvas, layers, updateLayers, saveToHistory]);
 
-  const moveLayerToBottom = useCallback((layerId) => {
+  const moveLayerToBottom = useCallback((layerId: string) => {
     if (!canvas) return;
     
     const objects = canvas.getObjects();
@@ -539,7 +666,7 @@ const groupSelectedLayers = useCallback(() => {
     const obj = objects[objects.length - 1 - layerIndex];
     
     if (obj) {
-      canvas.sendToBack(obj);
+      (canvas as any).sendToBack(obj);
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
@@ -550,11 +677,10 @@ const groupSelectedLayers = useCallback(() => {
     if (!canvas) return;
     const activeSelection = canvas.getActiveObject();
     if (activeSelection && activeSelection.type === 'activeSelection') {
-      const group = activeSelection.toGroup();
+      const group = (activeSelection as any).toGroup();
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
-
     }
   }, [canvas, updateLayers, saveToHistory]);
 
@@ -564,8 +690,8 @@ const groupSelectedLayers = useCallback(() => {
     const cropRect = new Rect({
       left: activeObject.left,
       top: activeObject.top,
-      width: activeObject.width * activeObject.scaleX,
-      height: activeObject.height * activeObject.scaleY,
+      width: (activeObject.width || 0) * (activeObject.scaleX || 1),
+      height: (activeObject.height || 0) * (activeObject.scaleY || 1),
       fill: 'transparent',
       stroke: '#ff0000',
       strokeWidth: 2,
@@ -576,7 +702,6 @@ const groupSelectedLayers = useCallback(() => {
     canvas.add(cropRect);
     canvas.setActiveObject(cropRect);
     canvas.requestRenderAll();
-
   }, [canvas, activeObject]);
 
   const applyCrop = useCallback(() => {
@@ -584,48 +709,45 @@ const groupSelectedLayers = useCallback(() => {
     const cropRect = canvas.getActiveObject();
     const image = canvas.getObjects().find(obj => obj.type === 'image');
     
-    if (cropRect && image && cropRect.stroke === '#ff0000') {
+    if (cropRect && image && (cropRect as any).stroke === '#ff0000') {
       image.set({
-        cropX: (cropRect.left - image.left) / image.scaleX,
-        cropY: (cropRect.top - image.top) / image.scaleY,
-        width: cropRect.width / image.scaleX,
-        height: cropRect.height / image.scaleY
-      });
+        cropX: ((cropRect.left || 0) - (image.left || 0)) / (image.scaleX || 1),
+        cropY: ((cropRect.top || 0) - (image.top || 0)) / (image.scaleY || 1),
+        width: (cropRect.width || 0) / (image.scaleX || 1),
+        height: (cropRect.height || 0) / (image.scaleY || 1)
+      } as any);
       
       canvas.remove(cropRect);
       canvas.setActiveObject(image);
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
-
     }
   }, [canvas, updateLayers, saveToHistory]);
-
-  const maskWithShape = useCallback((shape) => {
+  const maskWithShape = useCallback((shape: string) => {
     if (!canvas || !activeObject || activeObject.type !== 'image') return;
     
-    const imgElement = activeObject.getElement();
+    const imgElement = (activeObject as any).getElement();
     const tempCanvas = document.createElement('canvas');
     const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return;
     
-    const size = Math.min(activeObject.width * activeObject.scaleX, activeObject.height * activeObject.scaleY);
-    const getStrokeWidth = (size) => Math.max(1, Math.min(8, size / 25));
+    const size = Math.min(
+      (activeObject.width || 0) * (activeObject.scaleX || 1), 
+      (activeObject.height || 0) * (activeObject.scaleY || 1)
+    );
+    const getStrokeWidth = (size: number) => Math.max(1, Math.min(8, size / 25));
     const strokeWidth = getStrokeWidth(size);
     
     tempCanvas.width = size;
     tempCanvas.height = size;
     
     if (shape === 'circle') {
-      // Save the state before clipping
       ctx.save();
-      
-      // Draw the image with circular clipping
       ctx.beginPath();
       ctx.arc(size/2, size/2, size/2, 0, Math.PI * 2);
       ctx.clip();
       ctx.drawImage(imgElement, 0, 0, size, size);
-      
-      // Reset clipping and draw the circular stroke on top
       ctx.restore();
       ctx.beginPath();
       ctx.arc(size/2, size/2, size/2 - strokeWidth/2, 0, Math.PI * 2);
@@ -633,16 +755,11 @@ const groupSelectedLayers = useCallback(() => {
       ctx.lineWidth = strokeWidth;
       ctx.stroke();
     } else if (shape === 'rectangle') {
-      // Save the state before clipping
       ctx.save();
-      
-      // Draw the image with rectangular clipping
       ctx.beginPath();
       ctx.rect(0, 0, size, size);
       ctx.clip();
       ctx.drawImage(imgElement, 0, 0, size, size);
-      
-      // Reset clipping and draw the rectangular stroke
       ctx.restore();
       ctx.beginPath();
       ctx.rect(strokeWidth/2, strokeWidth/2, size - strokeWidth, size - strokeWidth);
@@ -668,7 +785,6 @@ const groupSelectedLayers = useCallback(() => {
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
-
     };
     img.src = dataURL;
   }, [canvas, activeObject, updateLayers, saveToHistory]);
@@ -679,46 +795,41 @@ const groupSelectedLayers = useCallback(() => {
       return;
     }
 
-    // Get all objects on canvas
     const objects = canvas.getObjects();
-    let shapeToUse = null;
+    let shapeToUse: FabricObject | null = null;
     
-    // Look for any selectable shape object (not the active image, not visual indicators, not grid lines)
     for (let i = objects.length - 1; i >= 0; i--) {
       const obj = objects[i];
       
-      // Skip if it's the active image or visual indicators
       if (obj === activeObject || 
-          obj.id === 'grid-line' || 
-          obj.name === 'customShapePoint' || 
-          obj.name === 'customShapeLine') {
+          (obj as any).id === 'grid-line' || 
+          (obj as any).name === 'customShapePoint' || 
+          (obj as any).name === 'customShapeLine') {
         continue;
       }
       
-      // Check if it's a valid shape to use for masking
       const validTypes = ['path', 'rect', 'circle', 'ellipse', 'triangle', 'polygon'];
       
-      if (validTypes.includes(obj.type) || obj.selectable) {
+      if (validTypes.includes(obj.type || '') || (obj as any).selectable) {
         shapeToUse = obj;
         break;
       }
     }
 
     if (!shapeToUse) {
-      toast.error('Please create a shape first (circle, rectangle, custom shape, etc.). Then select the image and click "Mask with Shape".');
+      toast.error('Please create a shape first');
       return;
     }
 
     try {
-      // Create a new shape object directly instead of cloning
-      let clipShape;
+      let clipShape: FabricObject;
       
       if (shapeToUse.type === 'rect') {
         clipShape = new Rect({
           left: 0,
           top: 0,
-          width: shapeToUse.width * shapeToUse.scaleX,
-          height: shapeToUse.height * shapeToUse.scaleY,
+          width: (shapeToUse.width || 0) * (shapeToUse.scaleX || 1),
+          height: (shapeToUse.height || 0) * (shapeToUse.scaleY || 1),
           originX: 'left',
           originY: 'top'
         });
@@ -726,30 +837,26 @@ const groupSelectedLayers = useCallback(() => {
         clipShape = new Circle({
           left: 0,
           top: 0,
-          radius: shapeToUse.radius,
+          radius: (shapeToUse as any).radius,
           scaleX: shapeToUse.scaleX,
           scaleY: shapeToUse.scaleY,
           originX: 'left',
           originY: 'top'
         });
       } else {
-        // For other shapes, use a simple rect as fallback
         clipShape = new Rect({
           left: 0,
           top: 0,
-          width: (shapeToUse.width || 100) * (shapeToUse.scaleX || 1),
-          height: (shapeToUse.height || 100) * (shapeToUse.scaleY || 1),
+          width: ((shapeToUse.width || 100) * (shapeToUse.scaleX || 1)),
+          height: ((shapeToUse.height || 100) * (shapeToUse.scaleY || 1)),
           originX: 'left',
           originY: 'top'
         });
       }
       
-      // Remove the original shape from canvas
       canvas.remove(shapeToUse);
-      
-      // Apply as clipPath
-      activeObject.clipPath = clipShape;
-      activeObject.dirty = true;
+      (activeObject as any).clipPath = clipShape;
+      (activeObject as any).dirty = true;
       
       canvas.renderAll();
       updateLayers();
@@ -761,16 +868,16 @@ const groupSelectedLayers = useCallback(() => {
       toast.error('Failed to apply mask. Please try again.');
     }
   }, [canvas, activeObject, updateLayers, saveToHistory]);
-
-  const maskWithText = useCallback((text) => {
+  const maskWithText = useCallback((text: string) => {
     if (!canvas || !activeObject || !text || activeObject.type !== 'image') return;
     
-    const imgElement = activeObject.getElement();
+    const imgElement = (activeObject as any).getElement();
     const tempCanvas = document.createElement('canvas');
     const ctx = tempCanvas.getContext('2d');
+    if (!ctx) return;
     
-    const width = activeObject.width * activeObject.scaleX;
-    const height = activeObject.height * activeObject.scaleY;
+    const width = (activeObject.width || 0) * (activeObject.scaleX || 1);
+    const height = (activeObject.height || 0) * (activeObject.scaleY || 1);
     tempCanvas.width = width;
     tempCanvas.height = height;
     
@@ -801,19 +908,17 @@ const groupSelectedLayers = useCallback(() => {
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
-
     };
     img.src = dataURL;
   }, [canvas, activeObject, updateLayers, saveToHistory]);
 
   const removeMask = useCallback(() => {
-    if (!canvas || !activeObject || !activeObject.clipPath) return;
+    if (!canvas || !activeObject || !(activeObject as any).clipPath) return;
     
-    activeObject.clipPath = null;
+    (activeObject as any).clipPath = null;
     canvas.requestRenderAll();
     updateLayers();
     saveToHistory();
-
   }, [canvas, activeObject, updateLayers, saveToHistory]);
 
   const fillShapeWithImage = useCallback(() => {
@@ -825,12 +930,12 @@ const groupSelectedLayers = useCallback(() => {
     const objects = canvas.getObjects();
     const validShapeTypes = ['rect', 'circle', 'triangle', 'ellipse', 'polygon', 'path', 'text', 'textbox'];
     const shapes = objects.filter(obj => 
-      validShapeTypes.includes(obj.type) && 
+      validShapeTypes.includes(obj.type || '') && 
       obj !== activeObject && 
       obj.type !== 'image' &&
-      obj.id !== 'grid-line' &&
-      obj.name !== 'customShapePoint' &&
-      obj.name !== 'customShapeLine'
+      (obj as any).id !== 'grid-line' &&
+      (obj as any).name !== 'customShapePoint' &&
+      (obj as any).name !== 'customShapeLine'
     );
     
     if (shapes.length === 0) {
@@ -838,13 +943,11 @@ const groupSelectedLayers = useCallback(() => {
       return;
     }
     
-    let shapeToFill = null;
+    let shapeToFill: FabricObject | null = null;
     
-    // If only one shape, use it
     if (shapes.length === 1) {
       shapeToFill = shapes[0];
     } else {
-      // Find the shape with maximum overlap or closest to the image
       const imageBounds = activeObject.getBoundingRect();
       let maxOverlap = 0;
       let closestDistance = Infinity;
@@ -852,7 +955,6 @@ const groupSelectedLayers = useCallback(() => {
       for (const shape of shapes) {
         const shapeBounds = shape.getBoundingRect();
         
-        // Calculate overlap area
         const overlapLeft = Math.max(imageBounds.left, shapeBounds.left);
         const overlapTop = Math.max(imageBounds.top, shapeBounds.top);
         const overlapRight = Math.min(imageBounds.left + imageBounds.width, shapeBounds.left + shapeBounds.width);
@@ -860,14 +962,12 @@ const groupSelectedLayers = useCallback(() => {
         
         const overlapArea = Math.max(0, overlapRight - overlapLeft) * Math.max(0, overlapBottom - overlapTop);
         
-        // Calculate distance between centers
         const imageCenterX = imageBounds.left + imageBounds.width / 2;
         const imageCenterY = imageBounds.top + imageBounds.height / 2;
         const shapeCenterX = shapeBounds.left + shapeBounds.width / 2;
         const shapeCenterY = shapeBounds.top + shapeBounds.height / 2;
         const distance = Math.sqrt(Math.pow(imageCenterX - shapeCenterX, 2) + Math.pow(imageCenterY - shapeCenterY, 2));
         
-        // Prioritize shapes with overlap, then by proximity
         if (overlapArea > maxOverlap || (overlapArea === maxOverlap && distance < closestDistance)) {
           maxOverlap = overlapArea;
           closestDistance = distance;
@@ -882,20 +982,18 @@ const groupSelectedLayers = useCallback(() => {
     }
     
     try {
-      // Get the image element and create a canvas to resize it
-      const imgElement = activeObject.getElement();
+      const imgElement = (activeObject as any).getElement();
       const tempCanvas = document.createElement('canvas');
       const ctx = tempCanvas.getContext('2d');
+      if (!ctx) return;
       
-      // Get shape dimensions
-      let shapeWidth, shapeHeight;
+      let shapeWidth: number, shapeHeight: number;
       
       if (shapeToFill.type === 'circle') {
-        shapeWidth = shapeHeight = shapeToFill.radius * 2 * (shapeToFill.scaleX || 1);
+        shapeWidth = shapeHeight = ((shapeToFill as any).radius || 0) * 2 * (shapeToFill.scaleX || 1);
       } else if (shapeToFill.type === 'text' || shapeToFill.type === 'textbox') {
         const bounds = shapeToFill.getBoundingRect();
-        // Add padding to prevent cutting when font size increases
-        const padding = Math.max(20, (shapeToFill.fontSize || 20) * 0.2);
+        const padding = Math.max(20, ((shapeToFill as any).fontSize || 20) * 0.2);
         shapeWidth = bounds.width + padding * 2;
         shapeHeight = bounds.height + padding * 2;
       } else {
@@ -903,26 +1001,18 @@ const groupSelectedLayers = useCallback(() => {
         shapeHeight = (shapeToFill.height || 100) * (shapeToFill.scaleY || 1);
       }
       
-      // Set canvas size to match shape
       tempCanvas.width = shapeWidth;
       tempCanvas.height = shapeHeight;
       
-      // Draw image to fit the shape
       ctx.drawImage(imgElement, 0, 0, shapeWidth, shapeHeight);
       
-      // Create pattern from resized image
       const pattern = new fabric.Pattern({
         source: tempCanvas,
         repeat: 'no-repeat'
       });
       
-      // Apply pattern as fill to the shape
       shapeToFill.set('fill', pattern);
-      
-      // Remove the original image
       canvas.remove(activeObject);
-      
-      // Select the filled shape
       canvas.setActiveObject(shapeToFill);
       
       canvas.renderAll();
@@ -935,10 +1025,134 @@ const groupSelectedLayers = useCallback(() => {
       toast.error('Failed to fill shape with image');
     }
   }, [canvas, activeObject, updateLayers, saveToHistory]);
+  const applyFilterPreset = useCallback((preset: FilterPreset) => {
+    if (!canvas || !activeObject || activeObject.type !== 'image') {
+      toast.error('Please select an image to apply filters');
+      return;
+    }
+
+    try {
+      (activeObject as any).filters = [];
+      
+      preset.filters.forEach(filterConfig => {
+        let filter: any = null;
+        
+        switch (filterConfig.type) {
+          case 'Sepia':
+            filter = new (fabric as any).filters.Sepia();
+            break;
+          case 'BlackWhite':
+            filter = new (fabric as any).filters.BlackWhite();
+            break;
+          case 'Contrast':
+            filter = new (fabric as any).filters.Contrast({ 
+              contrast: filterConfig.value ? filterConfig.value / 100 : 0 
+            });
+            break;
+          case 'Brightness':
+            filter = new (fabric as any).filters.Brightness({ 
+              brightness: filterConfig.value ? filterConfig.value / 100 : 0 
+            });
+            break;
+          case 'Saturation':
+            filter = new (fabric as any).filters.Saturation({ 
+              saturation: filterConfig.value ? filterConfig.value / 100 : 0 
+            });
+            break;
+          case 'Blur':
+            filter = new (fabric as any).filters.Blur({ 
+              blur: filterConfig.value ? filterConfig.value / 100 : 0 
+            });
+            break;
+        }
+        
+        if (filter) {
+          (activeObject as any).filters.push(filter);
+        }
+      });
+      
+      (activeObject as any).applyFilters();
+      canvas.renderAll();
+      setActiveFilterPreset(preset);
+      saveToHistory();
+      toast.success(`Applied ${preset.name} filter`);
+    } catch (error) {
+      console.error('Filter application error:', error);
+      toast.error('Failed to apply filter');
+    }
+  }, [canvas, activeObject, saveToHistory]);
+
+  const removeFilters = useCallback(() => {
+    if (!canvas || !activeObject || activeObject.type !== 'image') {
+      return;
+    }
+
+    (activeObject as any).filters = [];
+    (activeObject as any).applyFilters();
+    canvas.renderAll();
+    setActiveFilterPreset(null);
+    saveToHistory();
+    toast.success('Filters removed');
+  }, [canvas, activeObject, saveToHistory]);
+
+  const applyTemplateContrast = useCallback((contrastValue: number) => {
+    if (!canvas) return;
+    
+    setTemplateContrast(contrastValue);
+    
+    const objects = canvas.getObjects();
+    let hasTemplateElements = false;
+    
+    objects.forEach(obj => {
+      if ((obj as any).isTemplateImage || (obj as any).isTemplateText) {
+        hasTemplateElements = true;
+        
+        if (!(obj as any).filters) {
+          (obj as any).filters = [];
+        }
+        
+        (obj as any).filters = (obj as any).filters.filter((f: any) => !(f instanceof (fabric as any).filters.Contrast));
+        
+        if (contrastValue !== 0) {
+          const contrastFilter = new (fabric as any).filters.Contrast({ 
+            contrast: contrastValue / 100 
+          });
+          (obj as any).filters.push(contrastFilter);
+          (obj as any).applyFilters();
+        }
+      }
+    });
+    
+    if (hasTemplateElements) {
+      canvas.renderAll();
+      saveToHistory();
+    }
+  }, [canvas, saveToHistory]);
+
+  const applyBackgroundOpacity = useCallback((opacityValue: number) => {
+    if (!canvas) return;
+    
+    setBackgroundOpacity(opacityValue);
+    
+    const objects = canvas.getObjects();
+    let hasBackground = false;
+    
+    objects.forEach(obj => {
+      if ((obj as any).isBackgroundImage) {
+        hasBackground = true;
+        obj.set('opacity', opacityValue / 100);
+      }
+    });
+    
+    if (hasBackground) {
+      canvas.renderAll();
+      saveToHistory();
+    }
+  }, [canvas, saveToHistory]);
 
   // Add keyboard shortcuts for undo/redo
   useEffect(() => {
-    const handleKeyDown = (e) => {
+    const handleKeyDown = (e: KeyboardEvent) => {
       if (e.ctrlKey || e.metaKey) {
         if (e.key === 'z' && !e.shiftKey) {
           e.preventDefault();
@@ -954,9 +1168,7 @@ const groupSelectedLayers = useCallback(() => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-
-
-  const value = {
+  const value: EditorContextType = {
     canvas,
     setCanvas,
     canvasRef,
@@ -1028,7 +1240,17 @@ const groupSelectedLayers = useCallback(() => {
     isDrawingCustom,
     setIsDrawingCustom,
     customPath,
-    setCustomPath
+    setCustomPath,
+    applyFilterPreset,
+    removeFilters,
+    activeFilterPreset,
+    setActiveFilterPreset,
+    templateContrast,
+    setTemplateContrast,
+    backgroundOpacity,
+    setBackgroundOpacity,
+    applyTemplateContrast,
+    applyBackgroundOpacity
   };
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
