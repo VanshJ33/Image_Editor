@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Check, X } from 'lucide-react';
 import { Button } from '../ui/button';
-import { useEditor } from '../../contexts/EditorContext';
+import { useEditor } from '../../contexts/EditorContext.tsx';
 import { Rect, FabricImage } from 'fabric';
 
 const CropDialog = ({ isOpen, onClose, imageObject }) => {

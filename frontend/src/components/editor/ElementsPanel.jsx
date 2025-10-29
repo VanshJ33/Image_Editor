@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Search, Sparkles } from 'lucide-react';
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
-import { useEditor } from '../../contexts/EditorContext';
+import { useEditor } from '../../contexts/EditorContext.tsx';
 import { FabricImage, Path, Circle, Rect, Polygon, Textbox } from 'fabric';
 import { toast } from 'sonner';
 import { stickerLibrary, getAllStickers, stickerCategories } from '../../data/stickers';

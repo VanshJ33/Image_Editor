@@ -6,7 +6,7 @@ import { Label } from '../ui/label';
 import { Input } from '../ui/input';
 import { LayoutTemplate, Upload, Type, Shapes, Image as ImageIcon, Sparkles, Palette, Search, Wand2, Zap, Crown, Layers3, Paintbrush } from 'lucide-react';
 import { motion } from 'framer-motion';
-import { useEditor } from '../../contexts/EditorContext';
+import { useEditor } from '../../contexts/EditorContext.tsx';
 import { Textbox, Rect, Circle, Triangle, Line, FabricImage, FabricText, Polygon, Ellipse, Path, Gradient, Group, FabricObject } from 'fabric';
 import { applySpacingPreset, textSpacingPresets, defaultTextProperties, textEffectPresets, applyTextEffect, textHeadingPresets, textCurvePresets, createCurvedTextGroup, applyCurvePreset } from '../../config/textProperties';
 import { defaultShapeProperties, commonShapeColors, createShape, createPresetShape } from '../../config/shapeProperties';

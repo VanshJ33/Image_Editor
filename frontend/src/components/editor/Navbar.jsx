@@ -1,7 +1,8 @@
 import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
-import { useEditor } from '../../contexts/EditorContext';
-import { Undo, Redo, Download, Save, Plus, ZoomIn, ZoomOut, Moon, Sun, Grid3x3, ArrowUp, ArrowDown, Copy, Trash2, Keyboard, RotateCcw, Maximize2, Layers, RotateCw } from 'lucide-react';
+import { useEditor } from '../../contexts/EditorContext.tsx';
+import { Undo, Redo, Download, Save, Plus, ZoomIn, ZoomOut, Moon, Sun, Grid3x3, ArrowUp, ArrowDown, Copy, Trash2, Keyboard, RotateCcw, Maximize2, Layers, RotateCw, Minimize2 } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Toaster } from '../ui/sonner';
@@ -13,6 +14,8 @@ import {
 
 const Navbar = () => {
   const { canvas, undo, redo, zoom, setZoom, isDarkMode, setIsDarkMode, saveToHistory, showGrid, setShowGrid, activeObject, bringForward, sendBackward, copyObject, deleteObject, exportCanvas, duplicateObject, centerObject, resetCanvas, isLoading, rotateCanvas, history, historyStep } = useEditor();
+  const location = useLocation();
+  const navigate = useNavigate();
 
   const handleExport = async () => {
     try {
@@ -43,11 +46,48 @@ const Navbar = () => {
   };
 
   const handleZoomIn = () => {
-    setZoom(prev => Math.min(prev + 10, 200));
+    if (canvas) {
+      const currentZoom = canvas.getZoom();
+      const newZoom = Math.min(currentZoom * 1.2, 5);
+      const center = { x: canvas.getWidth() / 2, y: canvas.getHeight() / 2 };
+      canvas.zoomToPoint(center, newZoom);
+      setZoom(Math.round(newZoom * 100));
+      canvas.requestRenderAll();
+    } else {
+      setZoom(prev => Math.min(prev + 10, 500));
+    }
   };
 
   const handleZoomOut = () => {
-    setZoom(prev => Math.max(prev - 10, 25));
+    if (canvas) {
+      const currentZoom = canvas.getZoom();
+      const newZoom = Math.max(currentZoom * 0.8, 0.1);
+      const center = { x: canvas.getWidth() / 2, y: canvas.getHeight() / 2 };
+      canvas.zoomToPoint(center, newZoom);
+      setZoom(Math.round(newZoom * 100));
+      canvas.requestRenderAll();
+    } else {
+      setZoom(prev => Math.max(prev - 10, 10));
+    }
+  };
+
+  const handleFitToScreen = () => {
+    if (canvas && canvas.wrapperEl) {
+      const container = canvas.wrapperEl.parentElement;
+      if (container) {
+        const containerWidth = container.clientWidth - 100;
+        const containerHeight = container.clientHeight - 100;
+        
+        const scaleX = containerWidth / canvasSize.width;
+        const scaleY = containerHeight / canvasSize.height;
+        const scale = Math.min(scaleX, scaleY, 1);
+        
+        const center = { x: canvas.getWidth() / 2, y: canvas.getHeight() / 2 };
+        canvas.zoomToPoint(center, scale);
+        setZoom(Math.max(10, Math.round(scale * 100)));
+        canvas.requestRenderAll();
+      }
+    }
   };
 
   const toggleTheme = () => {
@@ -152,14 +192,21 @@ const Navbar = () => {
             </>
           )}
 
-          <Button onClick={handleZoomOut} variant="ghost" size="icon" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+          <Button onClick={handleZoomOut} variant="ghost" size="icon" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" title="Zoom Out">
             <ZoomOut className="w-4 h-4" />
           </Button>
-          <span className="text-sm font-medium text-slate-600 dark:text-slate-300 min-w-[60px] text-center">
+          <button 
+            onClick={handleFitToScreen}
+            className="px-2 py-1.5 text-xs font-medium text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-all min-w-[60px]"
+            title="Fit to Screen (Ctrl+0)"
+          >
             {zoom}%
-          </span>
-          <Button onClick={handleZoomIn} variant="ghost" size="icon" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+          </button>
+          <Button onClick={handleZoomIn} variant="ghost" size="icon" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" title="Zoom In">
             <ZoomIn className="w-4 h-4" />
+          </Button>
+          <Button onClick={handleFitToScreen} variant="ghost" size="icon" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" title="Fit to Screen">
+            <Minimize2 className="w-4 h-4" />
           </Button>
 
           <div className="w-px h-8 bg-slate-200 dark:bg-slate-700 mx-2" />

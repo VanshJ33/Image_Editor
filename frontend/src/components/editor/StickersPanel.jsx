@@ -4,7 +4,7 @@ import { Search, Grid3X3, Loader2, Download, Star, Sparkles } from 'lucide-react
 import { Input } from '../ui/input';
 import { Button } from '../ui/button';
 import { ScrollArea } from '../ui/scroll-area';
-import { useEditor } from '../../contexts/EditorContext';
+import { useEditor } from '../../contexts/EditorContext.tsx';
 import { FabricImage } from 'fabric';
 import { toast } from 'sonner';
 import stickerService from '../../services/sticker-service';

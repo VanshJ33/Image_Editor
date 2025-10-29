@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useEditor } from '../../contexts/EditorContext';
+import { useEditor } from '../../contexts/EditorContext.tsx';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
 import { ScrollArea } from '../ui/scroll-area';
 import { Label } from '../ui/label';
@@ -22,8 +22,7 @@ const LayerItem = ({ layer, index, selectedLayers, selectLayer, toggleLayerVisib
 
   return (
     <Reorder.Item key={layer.id} value={layer}>
-      <motion.div
-        whileHover={{ x: 4 }}
+      <div
         className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${
           isSelected
             ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
@@ -108,7 +107,7 @@ const LayerItem = ({ layer, index, selectedLayers, selectLayer, toggleLayerVisib
             <Ungroup className="w-4 h-4" />
           </Button>
         )}
-      </motion.div>
+      </div>
       
       {layer.isGroup && isExpanded && layer.children.length > 0 && (
         <div className="ml-4 mt-2 space-y-2">
@@ -140,8 +139,8 @@ const RightSidebar = () => {
     layers, 
     saveToHistory, 
     updateLayers, 
-    groupObjects, 
-    ungroupObjects,
+    // groupObjects, 
+    // ungroupObjects,
     selectedLayers,
     selectLayer,
     selectAllLayers,
@@ -150,10 +149,6 @@ const RightSidebar = () => {
     expandedGroups,
     toggleGroupExpansion,
     ungroupLayer,
-    maskWithShape,
-    maskWithText,
-    removeMask,
-    maskImageWithCustomShape,
     applyFilterPreset,
     removeFilters,
     activeFilterPreset,

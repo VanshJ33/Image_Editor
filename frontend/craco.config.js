@@ -68,6 +68,18 @@ const webpackConfig = {
         webpackConfig.plugins.push(healthPluginInstance);
       }
 
+      // Resolve ESM fullySpecified issues and alias roughjs paths used by Excalidraw
+      webpackConfig.resolve = {
+        ...(webpackConfig.resolve || {}),
+        fullySpecified: false,
+        alias: {
+          ...(webpackConfig.resolve ? webpackConfig.resolve.alias : {}),
+          'roughjs/bin/rough': require.resolve('roughjs/bin/rough.js'),
+          'roughjs/bin/generator': require.resolve('roughjs/bin/generator.js'),
+          'roughjs/bin/math': require.resolve('roughjs/bin/math.js'),
+        },
+      };
+
       return webpackConfig;
     },
   },

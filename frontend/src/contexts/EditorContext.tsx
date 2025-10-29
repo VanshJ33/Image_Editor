@@ -1,154 +1,26 @@
-import React, { createContext, useContext, useState, useCallback, useRef, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Group, Rect, Circle, Text, FabricImage, Path, Canvas as FabricCanvas, FabricObject } from 'fabric';
 import * as fabric from 'fabric';
 
-interface CanvasSize {
-  width: number;
-  height: number;
-}
+const EditorContext = createContext<any>(null);
 
-interface Filters {
-  brightness: number;
-  contrast: number;
-  saturation: number;
-  blur: number;
-}
-
-interface Layer {
-  id: string;
-  name: string;
-  type: string;
-  visible: boolean;
-  locked: boolean;
-  index: number;
-  parentId: string | null;
-  isGroup: boolean;
-  children: Layer[];
-}
-
-interface Board {
-  id: number;
-  name: string;
-  data: any;
-}
-
-interface FilterPreset {
-  name: string;
-  filters: Array<{
-    type: string;
-    value?: number;
-  }>;
-}
-
-interface EditorContextType {
-  canvas: FabricCanvas | null;
-  setCanvas: (canvas: FabricCanvas | null) => void;
-  canvasRef: React.RefObject<HTMLCanvasElement>;
-  activeObject: FabricObject | null;
-  setActiveObject: (obj: FabricObject | null) => void;
-  zoom: number;
-  setZoom: (zoom: number) => void;
-  canvasSize: CanvasSize;
-  setCanvasSize: (size: CanvasSize) => void;
-  backgroundColor: string;
-  setBackgroundColor: (color: string) => void;
-  history: any[];
-  historyStep: number;
-  saveToHistory: () => void;
-  undo: () => void;
-  redo: () => void;
-  layers: Layer[];
-  updateLayers: () => void;
-  selectedTemplate: any;
-  setSelectedTemplate: (template: any) => void;
-  isDarkMode: boolean;
-  setIsDarkMode: (dark: boolean) => void;
-  showGrid: boolean;
-  setShowGrid: (show: boolean) => void;
-  copyObject: () => void;
-  pasteObject: () => void;
-  deleteObject: () => void;
-  bringForward: () => void;
-  sendBackward: () => void;
-  clipboardObject: FabricObject | null;
-  isLoading: boolean;
-  setIsLoading: (loading: boolean) => void;
-  filters: Filters;
-  setFilters: (filters: Filters) => void;
-  exportCanvas: (format?: string, quality?: number) => string | undefined;
-  duplicateObject: () => void;
-  centerObject: () => void;
-  resetCanvas: () => void;
-  boards: Board[];
-  activeBoard: number;
-  createBoard: () => void;
-  switchBoard: (boardId: number) => void;
-  closeBoard: (boardId: number) => void;
-  duplicateBoard: (boardId: number) => void;
-  rotateCanvas: (direction: 'left' | 'right') => void;
-  canvasRotation: number;
-  groupObjects: () => void;
-  ungroupObjects: () => void;
-  selectedLayers: string[];
-  selectLayer: (layerId: string) => void;
-  selectAllLayers: () => void;
-  clearLayerSelection: () => void;
-  groupSelectedLayers: () => void;
-  expandedGroups: Set<string>;
-  toggleGroupExpansion: (groupId: string) => void;
-  ungroupLayer: (layerId: string) => void;
-  cropImage: () => void;
-  applyCrop: () => void;
-  maskWithShape: (shape: string) => void;
-  maskWithText: (text: string) => void;
-  removeMask: () => void;
-  maskImageWithCustomShape: () => void;
-  fillShapeWithImage: () => void;
-  resizeCanvas: (width: number, height: number) => void;
-  moveLayerUp: (layerId: string) => void;
-  moveLayerDown: (layerId: string) => void;
-  moveLayerToTop: (layerId: string) => void;
-  moveLayerToBottom: (layerId: string) => void;
-  isDrawingCustom: boolean;
-  setIsDrawingCustom: (drawing: boolean) => void;
-  customPath: Array<{x: number, y: number}>;
-  setCustomPath: (path: Array<{x: number, y: number}>) => void;
-  applyFilterPreset: (preset: FilterPreset) => void;
-  removeFilters: () => void;
-  activeFilterPreset: FilterPreset | null;
-  setActiveFilterPreset: (preset: FilterPreset | null) => void;
-  templateContrast: number;
-  setTemplateContrast: (contrast: number) => void;
-  backgroundOpacity: number;
-  setBackgroundOpacity: (opacity: number) => void;
-  applyTemplateContrast: (contrast: number) => void;
-  applyBackgroundOpacity: (opacity: number) => void;
-}
-
-const EditorContext = createContext<EditorContextType | null>(null);
-
-export const useEditor = (): EditorContextType => {
+export const useEditor = () => {
   const context = useContext(EditorContext);
   if (!context) {
     throw new Error('useEditor must be used within EditorProvider');
   }
   return context;
 };
-
-interface EditorProviderProps {
-  children: ReactNode;
-}
-
-export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
+export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [canvas, setCanvas] = useState<FabricCanvas | null>(null);
   const [activeObject, setActiveObject] = useState<FabricObject | null>(null);
   const [zoom, setZoom] = useState<number>(100);
-  const [canvasSize, setCanvasSize] = useState<CanvasSize>({ width: 1080, height: 1080 });
+  const [canvasSize, setCanvasSize] = useState<{ width: number; height: number }>({ width: 1080, height: 1080 });
   const [backgroundColor, setBackgroundColor] = useState<string>('#ffffff');
   const [history, setHistory] = useState<any[]>([]);
   const [historyStep, setHistoryStep] = useState<number>(-1);
-  const [layers, setLayers] = useState<Layer[]>([]);
+  const [layers, setLayers] = useState<any[]>([]);
   const [selectedLayers, setSelectedLayers] = useState<string[]>([]);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [selectedTemplate, setSelectedTemplate] = useState<any>(null);
@@ -156,23 +28,23 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
   const [showGrid, setShowGrid] = useState<boolean>(false);
   const [clipboardObject, setClipboardObject] = useState<FabricObject | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [filters, setFilters] = useState<Filters>({
+  const [filters, setFilters] = useState<{ brightness: number; contrast: number; saturation: number; blur: number}>({
     brightness: 0,
     contrast: 0,
     saturation: 0,
     blur: 0
   });
-  const [activeFilterPreset, setActiveFilterPreset] = useState<FilterPreset | null>(null);
+  const [activeFilterPreset, setActiveFilterPreset] = useState<any>(null);
   const [templateContrast, setTemplateContrast] = useState<number>(0);
   const [backgroundOpacity, setBackgroundOpacity] = useState<number>(100);
-  const [boards, setBoards] = useState<Board[]>([{ id: 1, name: 'Board 1', data: null }]);
+  const [boards, setBoards] = useState<Array<{ id: number; name: string; data: any }>>([{ id: 1, name: 'Board 1', data: null }]);
   const [activeBoard, setActiveBoard] = useState<number>(1);
   const [canvasRotation, setCanvasRotation] = useState<number>(0);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
   const boardDataRef = useRef<Record<number, any>>({});
   const isInitialized = useRef<boolean>(false);
   const [isDrawingCustom, setIsDrawingCustom] = useState<boolean>(false);
-  const [customPath, setCustomPath] = useState<Array<{x: number, y: number}>>([]);
+  const [customPath, setCustomPath] = useState<any[]>([]);
   // Initialize history when canvas is first set
   useEffect(() => {
     if (canvas && !isInitialized.current) {
@@ -187,26 +59,30 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
   const updateLayers = useCallback(() => {
     if (canvas) {
       const objects = canvas.getObjects();
-      const layerList: Layer[] = [];
+      const layerList: any[] = [];
       
-      const processObject = (obj: FabricObject, index: number, parentId: string | null = null): Layer => {
+      const processObject = (obj: any, index: number, parentId: string | null = null) => {
         const layerId = `layer-${objects.length - 1 - index}`;
-        const layer: Layer = {
+        const layer: any = {
           id: layerId,
-          name: (obj as any).name || (obj.type === 'textbox' ? (obj as any).text?.substring(0, 20) + '...' : obj.type) || 'Layer',
-          type: obj.type || 'object',
-          visible: (obj as any).visible !== false,
-          locked: (obj as any).selectable === false,
+          name:
+            obj?.name ||
+            (obj?.type === 'textbox'
+              ? (obj?.text ? obj.text.substring(0, 20) + '...' : 'textbox')
+              : obj?.type) || 'Layer',
+          type: obj?.type || 'object',
+          visible: obj?.visible !== false,
+          locked: obj?.selectable === false,
           index: objects.length - 1 - index,
           parentId: parentId,
-          isGroup: obj.type === 'group',
+          isGroup: obj?.type === 'group',
           children: []
         };
         
-        if (obj.type === 'group' && (obj as any).getObjects) {
+        if (obj?.type === 'group' && typeof obj.getObjects === 'function') {
           // Process children of the group
-          const groupObjects = (obj as any).getObjects();
-          groupObjects.forEach((childObj: FabricObject, childIndex: number) => {
+          const groupObjects = obj.getObjects();
+          groupObjects.forEach((childObj: any) => {
             const childLayer = processObject(childObj, index, layerId);
             layer.children.push(childLayer);
           });
@@ -236,7 +112,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
       setHistoryStep(prev => prev + 1);
     }
   }, [canvas, historyStep]);
-
+  
   const undo = useCallback(() => {
     if (historyStep > 0 && canvas && history[historyStep - 1]) {
       const prevState = history[historyStep - 1];
@@ -247,7 +123,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
         updateLayers();
         // Update active object after undo
         const activeObj = canvas.getActiveObject();
-        setActiveObject(activeObj);
+        setActiveObject(activeObj as any);
       });
     }
   }, [canvas, history, historyStep, updateLayers]);
@@ -264,7 +140,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
           updateLayers();
           // Update active object after redo
           const activeObj = canvas.getActiveObject();
-          setActiveObject(activeObj);
+          setActiveObject(activeObj as any);
         });
       }
     }
@@ -279,9 +155,9 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
   const pasteObject = useCallback(() => {
     if (clipboardObject && canvas) {
       try {
-        const objectData = clipboardObject.toObject();
+        const objectData = (clipboardObject as any).toObject();
         const callback = (objects: FabricObject[]) => {
-          const cloned = objects[0];
+          const cloned: any = objects[0];
           cloned.set({
             left: (cloned.left || 0) + 20,
             top: (cloned.top || 0) + 20,
@@ -335,9 +211,9 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
   const duplicateObject = useCallback(() => {
     if (activeObject && canvas) {
       try {
-        const objectData = activeObject.toObject();
+        const objectData = (activeObject as any).toObject();
         const callback = (objects: FabricObject[]) => {
-          const cloned = objects[0];
+          const cloned: any = objects[0];
           cloned.set({
             left: (cloned.left || 0) + 20,
             top: (cloned.top || 0) + 20,
@@ -366,7 +242,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
   const resetCanvas = useCallback(() => {
     if (canvas) {
       canvas.clear();
-      canvas.backgroundColor = '#ffffff';
+      (canvas as any).backgroundColor = '#ffffff';
       setBackgroundColor('#ffffff');
       canvas.renderAll();
       saveToHistory();
@@ -401,10 +277,10 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
       } else {
         // New board - clear canvas
         canvas.clear();
-        canvas.backgroundColor = '#ffffff';
+        (canvas as any).backgroundColor = '#ffffff';
         setBackgroundColor('#ffffff');
         setCanvasSize({ width: 1080, height: 1080 });
-        canvas.setDimensions({ width: 1080, height: 1080 });
+        canvas.setDimensions({ width: 1080, height: 1080 } as any);
         setHistory([]);
         setHistoryStep(0);
         canvas.renderAll();
@@ -415,7 +291,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
 
   const createBoard = useCallback(() => {
     const newId = Math.max(...boards.map(b => b.id)) + 1;
-    const newBoard: Board = { id: newId, name: `Board ${newId}`, data: null };
+    const newBoard = { id: newId, name: `Board ${newId}`, data: null };
     setBoards(prev => [...prev, newBoard]);
     switchBoard(newId);
   }, [boards, switchBoard]);
@@ -436,7 +312,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     const boardToDuplicate = boards.find(b => b.id === boardId);
     if (boardToDuplicate && canvas) {
       const newId = Math.max(...boards.map(b => b.id)) + 1;
-      const newBoard: Board = { id: newId, name: `${boardToDuplicate.name} Copy`, data: null };
+      const newBoard = { id: newId, name: `${boardToDuplicate.name} Copy`, data: null };
       
       // If duplicating the currently active board, use current canvas state
       if (boardId === activeBoard) {
@@ -455,7 +331,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
             json: JSON.parse(JSON.stringify(sourceBoardData.json)),
             backgroundColor: sourceBoardData.backgroundColor,
             canvasSize: { ...sourceBoardData.canvasSize },
-            history: sourceBoardData.history.map((h: any) => JSON.parse(JSON.stringify(h))),
+            history: (sourceBoardData.history || []).map((h: any) => JSON.parse(JSON.stringify(h))),
             historyStep: sourceBoardData.historyStep
           };
         }
@@ -490,7 +366,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     const scaleY = newHeight / canvasSize.height;
     
     // Scale all objects to fit new canvas dimensions
-    canvas.getObjects().forEach(obj => {
+    canvas.getObjects().forEach((obj: any) => {
       obj.set({
         left: (obj.left || 0) * scaleX,
         top: (obj.top || 0) * scaleY,
@@ -502,7 +378,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     
     const newSize = { width: newWidth, height: newHeight };
     setCanvasSize(newSize);
-    canvas.setDimensions(newSize);
+    canvas.setDimensions(newSize as any);
     canvas.renderAll();
     updateLayers();
     saveToHistory();
@@ -523,6 +399,9 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     canvas.renderAll();
     saveToHistory();
   }, [canvas, canvasRotation, canvasSize, saveToHistory, resizeCanvas]);
+ 
+
+
 
   const selectLayer = useCallback((layerId: string) => {
     setSelectedLayers(prev => {
@@ -563,17 +442,17 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
       return objects[objects.length - 1 - layerIndex];
     }).filter(obj => obj);
 
-    if (objectsToGroup.length >= 2) {
+    if ((objectsToGroup as any[]).length >= 2) {
       // Remove original objects
-      objectsToGroup.forEach(obj => canvas.remove(obj));
+      (objectsToGroup as any[]).forEach((obj: any) => canvas.remove(obj));
       
-      const group = new Group(objectsToGroup, {
+      const group = new Group(objectsToGroup as any, {
         subTargetCheck: true,
         interactive: true
-      });
+      } as any);
       
-      canvas.add(group);
-      canvas.setActiveObject(group);
+      canvas.add(group as any);
+      canvas.setActiveObject(group as any);
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
@@ -583,11 +462,11 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
 
   const ungroupObjects = useCallback(() => {
     if (!canvas) return;
-    const activeObj = canvas.getActiveObject();
+    const activeObj: any = canvas.getActiveObject();
     if (activeObj && activeObj.type === 'group') {
       const objects = (activeObj as any).getObjects();
       canvas.remove(activeObj);
-      objects.forEach((obj: FabricObject) => canvas.add(obj));
+      (objects as any[]).forEach((obj: FabricObject) => canvas.add(obj));
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
@@ -599,12 +478,12 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     
     const objects = canvas.getObjects();
     const layerIndex = layers.findIndex(layer => layer.id === layerId);
-    const obj = objects[objects.length - 1 - layerIndex];
+    const obj: any = objects[objects.length - 1 - layerIndex];
     
     if (obj && obj.type === 'group') {
       const groupObjects = (obj as any).getObjects();
       canvas.remove(obj);
-      groupObjects.forEach((groupObj: FabricObject) => canvas.add(groupObj));
+      (groupObjects as any[]).forEach((groupObj: FabricObject) => canvas.add(groupObj));
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
@@ -617,7 +496,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     const objects = canvas.getObjects();
     const layerIndex = layers.findIndex(layer => layer.id === layerId);
     const objectIndex = objects.length - 1 - layerIndex;
-    const obj = objects[objectIndex];
+    const obj: any = objects[objectIndex];
     
     if (obj && objectIndex < objects.length - 1) {
       (canvas as any).bringForward(obj);
@@ -633,7 +512,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     const objects = canvas.getObjects();
     const layerIndex = layers.findIndex(layer => layer.id === layerId);
     const objectIndex = objects.length - 1 - layerIndex;
-    const obj = objects[objectIndex];
+    const obj: any = objects[objectIndex];
     
     if (obj && objectIndex > 0) {
       (canvas as any).sendBackwards(obj);
@@ -648,7 +527,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     
     const objects = canvas.getObjects();
     const layerIndex = layers.findIndex(layer => layer.id === layerId);
-    const obj = objects[objects.length - 1 - layerIndex];
+    const obj: any = objects[objects.length - 1 - layerIndex];
     
     if (obj) {
       (canvas as any).bringToFront(obj);
@@ -663,7 +542,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     
     const objects = canvas.getObjects();
     const layerIndex = layers.findIndex(layer => layer.id === layerId);
-    const obj = objects[objects.length - 1 - layerIndex];
+    const obj: any = objects[objects.length - 1 - layerIndex];
     
     if (obj) {
       (canvas as any).sendToBack(obj);
@@ -675,7 +554,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
 
   const groupObjects = useCallback(() => {
     if (!canvas) return;
-    const activeSelection = canvas.getActiveObject();
+    const activeSelection: any = canvas.getActiveObject();
     if (activeSelection && activeSelection.type === 'activeSelection') {
       const group = (activeSelection as any).toGroup();
       canvas.requestRenderAll();
@@ -685,31 +564,31 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
   }, [canvas, updateLayers, saveToHistory]);
 
   const cropImage = useCallback(() => {
-    if (!canvas || !activeObject || activeObject.type !== 'image') return;
+    if (!canvas || !activeObject || (activeObject as any).type !== 'image') return;
     
     const cropRect = new Rect({
-      left: activeObject.left,
-      top: activeObject.top,
-      width: (activeObject.width || 0) * (activeObject.scaleX || 1),
-      height: (activeObject.height || 0) * (activeObject.scaleY || 1),
+      left: (activeObject as any).left,
+      top: (activeObject as any).top,
+      width: ((activeObject as any).width || 0) * ((activeObject as any).scaleX || 1),
+      height: ((activeObject as any).height || 0) * ((activeObject as any).scaleY || 1),
       fill: 'transparent',
       stroke: '#ff0000',
       strokeWidth: 2,
       strokeDashArray: [5, 5],
       selectable: true
-    });
+    } as any);
     
-    canvas.add(cropRect);
-    canvas.setActiveObject(cropRect);
+    canvas.add(cropRect as any);
+    canvas.setActiveObject(cropRect as any);
     canvas.requestRenderAll();
   }, [canvas, activeObject]);
 
   const applyCrop = useCallback(() => {
     if (!canvas) return;
-    const cropRect = canvas.getActiveObject();
-    const image = canvas.getObjects().find(obj => obj.type === 'image');
+    const cropRect: any = canvas.getActiveObject();
+    const image: any = canvas.getObjects().find(obj => (obj as any).type === 'image');
     
-    if (cropRect && image && (cropRect as any).stroke === '#ff0000') {
+    if (cropRect && image && cropRect.stroke === '#ff0000') {
       image.set({
         cropX: ((cropRect.left || 0) - (image.left || 0)) / (image.scaleX || 1),
         cropY: ((cropRect.top || 0) - (image.top || 0)) / (image.scaleY || 1),
@@ -724,8 +603,9 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
       saveToHistory();
     }
   }, [canvas, updateLayers, saveToHistory]);
+
   const maskWithShape = useCallback((shape: string) => {
-    if (!canvas || !activeObject || activeObject.type !== 'image') return;
+    if (!canvas || !activeObject || (activeObject as any).type !== 'image') return;
     
     const imgElement = (activeObject as any).getElement();
     const tempCanvas = document.createElement('canvas');
@@ -733,8 +613,8 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     if (!ctx) return;
     
     const size = Math.min(
-      (activeObject.width || 0) * (activeObject.scaleX || 1), 
-      (activeObject.height || 0) * (activeObject.scaleY || 1)
+      ((activeObject as any).width || 0) * ((activeObject as any).scaleX || 1), 
+      ((activeObject as any).height || 0) * ((activeObject as any).scaleY || 1)
     );
     const getStrokeWidth = (size: number) => Math.max(1, Math.min(8, size / 25));
     const strokeWidth = getStrokeWidth(size);
@@ -771,17 +651,17 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     const dataURL = tempCanvas.toDataURL();
     const img = new Image();
     img.onload = () => {
-      const fabricImg = new FabricImage(img);
+      const fabricImg = new FabricImage(img) as any;
       fabricImg.set({
-        left: activeObject.left,
-        top: activeObject.top,
+        left: (activeObject as any).left,
+        top: (activeObject as any).top,
         scaleX: 1,
         scaleY: 1
       });
       
-      canvas.remove(activeObject);
-      canvas.add(fabricImg);
-      canvas.setActiveObject(fabricImg);
+      canvas.remove(activeObject as any);
+      canvas.add(fabricImg as any);
+      canvas.setActiveObject(fabricImg as any);
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
@@ -790,27 +670,27 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
   }, [canvas, activeObject, updateLayers, saveToHistory]);
 
   const maskImageWithCustomShape = useCallback(() => {
-    if (!canvas || !activeObject || activeObject.type !== 'image') {
+    if (!canvas || !activeObject || (activeObject as any).type !== 'image') {
       toast.error('Please select an image to mask');
       return;
     }
 
     const objects = canvas.getObjects();
-    let shapeToUse: FabricObject | null = null;
+    let shapeToUse: any | null = null;
     
     for (let i = objects.length - 1; i >= 0; i--) {
-      const obj = objects[i];
+      const obj: any = objects[i];
       
       if (obj === activeObject || 
-          (obj as any).id === 'grid-line' || 
-          (obj as any).name === 'customShapePoint' || 
-          (obj as any).name === 'customShapeLine') {
+          obj.id === 'grid-line' || 
+          obj.name === 'customShapePoint' || 
+          obj.name === 'customShapeLine') {
         continue;
       }
       
       const validTypes = ['path', 'rect', 'circle', 'ellipse', 'triangle', 'polygon'];
       
-      if (validTypes.includes(obj.type || '') || (obj as any).selectable) {
+      if (validTypes.includes(obj.type || '') || obj.selectable) {
         shapeToUse = obj;
         break;
       }
@@ -822,7 +702,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     }
 
     try {
-      let clipShape: FabricObject;
+      let clipShape: any;
       
       if (shapeToUse.type === 'rect') {
         clipShape = new Rect({
@@ -832,7 +712,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
           height: (shapeToUse.height || 0) * (shapeToUse.scaleY || 1),
           originX: 'left',
           originY: 'top'
-        });
+        } as any);
       } else if (shapeToUse.type === 'circle') {
         clipShape = new Circle({
           left: 0,
@@ -842,7 +722,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
           scaleY: shapeToUse.scaleY,
           originX: 'left',
           originY: 'top'
-        });
+        } as any);
       } else {
         clipShape = new Rect({
           left: 0,
@@ -851,10 +731,10 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
           height: ((shapeToUse.height || 100) * (shapeToUse.scaleY || 1)),
           originX: 'left',
           originY: 'top'
-        });
+        } as any);
       }
       
-      canvas.remove(shapeToUse);
+      canvas.remove(shapeToUse as any);
       (activeObject as any).clipPath = clipShape;
       (activeObject as any).dirty = true;
       
@@ -868,16 +748,17 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
       toast.error('Failed to apply mask. Please try again.');
     }
   }, [canvas, activeObject, updateLayers, saveToHistory]);
+
   const maskWithText = useCallback((text: string) => {
-    if (!canvas || !activeObject || !text || activeObject.type !== 'image') return;
+    if (!canvas || !activeObject || !text || (activeObject as any).type !== 'image') return;
     
     const imgElement = (activeObject as any).getElement();
     const tempCanvas = document.createElement('canvas');
     const ctx = tempCanvas.getContext('2d');
     if (!ctx) return;
     
-    const width = (activeObject.width || 0) * (activeObject.scaleX || 1);
-    const height = (activeObject.height || 0) * (activeObject.scaleY || 1);
+    const width = ((activeObject as any).width || 0) * ((activeObject as any).scaleX || 1);
+    const height = ((activeObject as any).height || 0) * ((activeObject as any).scaleY || 1);
     tempCanvas.width = width;
     tempCanvas.height = height;
     
@@ -894,17 +775,17 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     const dataURL = tempCanvas.toDataURL();
     const img = new Image();
     img.onload = () => {
-      const fabricImg = new FabricImage(img);
+      const fabricImg = new FabricImage(img) as any;
       fabricImg.set({
-        left: activeObject.left,
-        top: activeObject.top,
+        left: (activeObject as any).left,
+        top: (activeObject as any).top,
         scaleX: 1,
         scaleY: 1
       });
       
-      canvas.remove(activeObject);
-      canvas.add(fabricImg);
-      canvas.setActiveObject(fabricImg);
+      canvas.remove(activeObject as any);
+      canvas.add(fabricImg as any);
+      canvas.setActiveObject(fabricImg as any);
       canvas.requestRenderAll();
       updateLayers();
       saveToHistory();
@@ -922,20 +803,20 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
   }, [canvas, activeObject, updateLayers, saveToHistory]);
 
   const fillShapeWithImage = useCallback(() => {
-    if (!canvas || !activeObject || activeObject.type !== 'image') {
+    if (!canvas || !activeObject || (activeObject as any).type !== 'image') {
       toast.error('Please select an image first');
       return;
     }
     
     const objects = canvas.getObjects();
     const validShapeTypes = ['rect', 'circle', 'triangle', 'ellipse', 'polygon', 'path', 'text', 'textbox'];
-    const shapes = objects.filter(obj => 
+    const shapes = objects.filter((obj: any) => 
       validShapeTypes.includes(obj.type || '') && 
       obj !== activeObject && 
       obj.type !== 'image' &&
-      (obj as any).id !== 'grid-line' &&
-      (obj as any).name !== 'customShapePoint' &&
-      (obj as any).name !== 'customShapeLine'
+      obj.id !== 'grid-line' &&
+      obj.name !== 'customShapePoint' &&
+      obj.name !== 'customShapeLine'
     );
     
     if (shapes.length === 0) {
@@ -943,17 +824,17 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
       return;
     }
     
-    let shapeToFill: FabricObject | null = null;
+    let shapeToFill: any | null = null;
     
     if (shapes.length === 1) {
       shapeToFill = shapes[0];
     } else {
-      const imageBounds = activeObject.getBoundingRect();
+      const imageBounds = (activeObject as any).getBoundingRect();
       let maxOverlap = 0;
-      let closestDistance = Infinity;
+      let closestDistance = Infinity as number;
       
-      for (const shape of shapes) {
-        const shapeBounds = shape.getBoundingRect();
+      for (const shape of shapes as any[]) {
+        const shapeBounds = (shape as any).getBoundingRect();
         
         const overlapLeft = Math.max(imageBounds.left, shapeBounds.left);
         const overlapTop = Math.max(imageBounds.top, shapeBounds.top);
@@ -989,16 +870,16 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
       
       let shapeWidth: number, shapeHeight: number;
       
-      if (shapeToFill.type === 'circle') {
-        shapeWidth = shapeHeight = ((shapeToFill as any).radius || 0) * 2 * (shapeToFill.scaleX || 1);
-      } else if (shapeToFill.type === 'text' || shapeToFill.type === 'textbox') {
-        const bounds = shapeToFill.getBoundingRect();
-        const padding = Math.max(20, ((shapeToFill as any).fontSize || 20) * 0.2);
+      if ((shapeToFill as any).type === 'circle') {
+        shapeWidth = shapeHeight = (((shapeToFill as any).radius || 0) * 2 * ((shapeToFill as any).scaleX || 1));
+      } else if ((shapeToFill as any).type === 'text' || (shapeToFill as any).type === 'textbox') {
+        const bounds = (shapeToFill as any).getBoundingRect();
+        const padding = Math.max(20, (((shapeToFill as any).fontSize || 20) * 0.2));
         shapeWidth = bounds.width + padding * 2;
         shapeHeight = bounds.height + padding * 2;
       } else {
-        shapeWidth = (shapeToFill.width || 100) * (shapeToFill.scaleX || 1);
-        shapeHeight = (shapeToFill.height || 100) * (shapeToFill.scaleY || 1);
+        shapeWidth = (((shapeToFill as any).width || 100) * ((shapeToFill as any).scaleX || 1));
+        shapeHeight = (((shapeToFill as any).height || 100) * ((shapeToFill as any).scaleY || 1));
       }
       
       tempCanvas.width = shapeWidth;
@@ -1006,14 +887,14 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
       
       ctx.drawImage(imgElement, 0, 0, shapeWidth, shapeHeight);
       
-      const pattern = new fabric.Pattern({
+      const pattern = new (fabric as any).Pattern({
         source: tempCanvas,
         repeat: 'no-repeat'
       });
       
-      shapeToFill.set('fill', pattern);
-      canvas.remove(activeObject);
-      canvas.setActiveObject(shapeToFill);
+      (shapeToFill as any).set('fill', pattern);
+      canvas.remove(activeObject as any);
+      canvas.setActiveObject(shapeToFill as any);
       
       canvas.renderAll();
       updateLayers();
@@ -1025,8 +906,9 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
       toast.error('Failed to fill shape with image');
     }
   }, [canvas, activeObject, updateLayers, saveToHistory]);
-  const applyFilterPreset = useCallback((preset: FilterPreset) => {
-    if (!canvas || !activeObject || activeObject.type !== 'image') {
+
+  const applyFilterPreset = useCallback((preset: any) => {
+    if (!canvas || !activeObject || (activeObject as any).type !== 'image') {
       toast.error('Please select an image to apply filters');
       return;
     }
@@ -1034,7 +916,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     try {
       (activeObject as any).filters = [];
       
-      preset.filters.forEach(filterConfig => {
+      preset.filters.forEach((filterConfig: any) => {
         let filter: any = null;
         
         switch (filterConfig.type) {
@@ -1083,7 +965,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
   }, [canvas, activeObject, saveToHistory]);
 
   const removeFilters = useCallback(() => {
-    if (!canvas || !activeObject || activeObject.type !== 'image') {
+    if (!canvas || !activeObject || (activeObject as any).type !== 'image') {
       return;
     }
 
@@ -1103,21 +985,21 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     const objects = canvas.getObjects();
     let hasTemplateElements = false;
     
-    objects.forEach(obj => {
-      if ((obj as any).isTemplateImage || (obj as any).isTemplateText) {
+    objects.forEach((obj: any) => {
+      if (obj.isTemplateImage || obj.isTemplateText) {
         hasTemplateElements = true;
         
-        if (!(obj as any).filters) {
-          (obj as any).filters = [];
+        if (!obj.filters) {
+          obj.filters = [];
         }
         
-        (obj as any).filters = (obj as any).filters.filter((f: any) => !(f instanceof (fabric as any).filters.Contrast));
+        obj.filters = (obj.filters as any[]).filter((f: any) => !(f instanceof (fabric as any).filters.Contrast));
         
         if (contrastValue !== 0) {
           const contrastFilter = new (fabric as any).filters.Contrast({ 
             contrast: contrastValue / 100 
           });
-          (obj as any).filters.push(contrastFilter);
+          obj.filters.push(contrastFilter);
           (obj as any).applyFilters();
         }
       }
@@ -1137,8 +1019,8 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     const objects = canvas.getObjects();
     let hasBackground = false;
     
-    objects.forEach(obj => {
-      if ((obj as any).isBackgroundImage) {
+    objects.forEach((obj: any) => {
+      if (obj.isBackgroundImage) {
         hasBackground = true;
         obj.set('opacity', opacityValue / 100);
       }
@@ -1168,7 +1050,7 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [undo, redo]);
 
-  const value: EditorContextType = {
+  const value: any = {
     canvas,
     setCanvas,
     canvasRef,
@@ -1255,3 +1137,5 @@ export const EditorProvider: React.FC<EditorProviderProps> = ({ children }) => {
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;
 };
+
+export default EditorProvider;
