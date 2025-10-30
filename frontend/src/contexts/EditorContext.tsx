@@ -110,8 +110,20 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return updatedHistory.slice(-50);
       });
       setHistoryStep(prev => prev + 1);
+      
+      // Auto-save to localStorage
+      try {
+        localStorage.setItem('editor-autosave', JSON.stringify({
+          canvas: json,
+          backgroundColor,
+          canvasSize,
+          timestamp: Date.now()
+        }));
+      } catch (e) {
+        console.warn('Failed to auto-save to localStorage:', e);
+      }
     }
-  }, [canvas, historyStep]);
+  }, [canvas, historyStep, backgroundColor, canvasSize]);
   
   const undo = useCallback(() => {
     if (historyStep > 0 && canvas && history[historyStep - 1]) {

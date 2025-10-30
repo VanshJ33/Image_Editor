@@ -8,8 +8,209 @@ import { toast } from 'sonner';
 import * as fabric from 'fabric';
 import { ActiveSelection } from 'fabric';
 
+// Minimal importer: Excalidraw -> Fabric objects (ellipse, text, arrow)
+function importExcalidrawToFabric(canvas, scene) {
+  try {
+    if (!canvas || !scene || !Array.isArray(scene.elements)) return false;
+
+    const mapDash = (style, width) => {
+      if (style === 'dashed') return [width * 4, width * 3];
+      if (style === 'dotted') return [width, width * 2];
+      return undefined;
+    };
+
+    const mapFont = (id) => {
+      switch (id) {
+        case 1: return 'Virgil, Segoe UI, Arial, sans-serif';
+        case 2: return 'Helvetica, Arial, sans-serif';
+        case 3: return 'Cascadia Code, Consolas, monospace';
+        default: return 'Arial, sans-serif';
+      }
+    };
+
+    const addArrowHead = (x1, y1, x2, y2, stroke, strokeWidth) => {
+      // Build a triangle polygon oriented along the line direction
+      const angleRad = Math.atan2(y2 - y1, x2 - x1);
+      const headLen = Math.max(10, strokeWidth * 4);
+      const headWidth = Math.max(6, strokeWidth * 2.5);
+      const backX = x2 - headLen * Math.cos(angleRad);
+      const backY = y2 - headLen * Math.sin(angleRad);
+      const leftX = backX + headWidth * Math.sin(angleRad);
+      const leftY = backY - headWidth * Math.cos(angleRad);
+      const rightX = backX - headWidth * Math.sin(angleRad);
+      const rightY = backY + headWidth * Math.cos(angleRad);
+      return new fabric.Polygon([
+        { x: x2, y: y2 },
+        { x: leftX, y: leftY },
+        { x: rightX, y: rightY },
+      ], {
+        fill: stroke,
+        stroke: stroke,
+        strokeWidth: 0,
+        selectable: false,
+        evented: false,
+      });
+    };
+
+    scene.elements.forEach((el) => {
+      const opacity = (el.opacity ?? 100) / 100;
+      const angleDeg = el.angle ? (el.angle * 180) / Math.PI : 0;
+      const stroke = el.strokeColor || '#0f172a';
+      const fill = el.backgroundColor && el.backgroundColor !== 'transparent' ? el.backgroundColor : 'transparent';
+      const strokeWidth = el.strokeWidth || 1;
+      const dashArray = mapDash(el.strokeStyle, strokeWidth);
+      const roundness = el.roundness && el.roundness.type ? Math.min((Math.min(el.width || 0, el.height || 0)) * 0.15, 20) : 0;
+
+      switch (el.type) {
+        case 'ellipse': {
+          const obj = new fabric.Ellipse({
+            left: el.x,
+            top: el.y,
+            rx: (el.width || 0) / 2,
+            ry: (el.height || 0) / 2,
+            fill,
+            stroke,
+            strokeWidth,
+            strokeDashArray: dashArray,
+            opacity,
+            angle: angleDeg,
+            originX: 'left',
+            originY: 'top',
+          });
+          canvas.add(obj);
+          break;
+        }
+        case 'rectangle': {
+          const obj = new fabric.Rect({
+            left: el.x,
+            top: el.y,
+            width: el.width || 0,
+            height: el.height || 0,
+            rx: roundness,
+            ry: roundness,
+            fill,
+            stroke,
+            strokeWidth,
+            strokeDashArray: dashArray,
+            opacity,
+            angle: angleDeg,
+            originX: 'left',
+            originY: 'top',
+          });
+          canvas.add(obj);
+          break;
+        }
+        case 'diamond': {
+          const w = el.width || 0;
+          const h = el.height || 0;
+          const points = [
+            { x: w / 2, y: 0 },
+            { x: w, y: h / 2 },
+            { x: w / 2, y: h },
+            { x: 0, y: h / 2 },
+          ];
+          const obj = new fabric.Polygon(points, {
+            left: el.x,
+            top: el.y,
+            fill,
+            stroke,
+            strokeWidth,
+            strokeDashArray: dashArray,
+            opacity,
+            angle: angleDeg,
+            originX: 'left',
+            originY: 'top',
+          });
+          canvas.add(obj);
+          break;
+        }
+        case 'line': {
+          const p0 = (el.points && el.points[0]) || [0, 0];
+          const p1 = (el.points && el.points[1]) || [0, 0];
+          const x1 = el.x + p0[0];
+          const y1 = el.y + p0[1];
+          const x2 = el.x + p1[0];
+          const y2 = el.y + p1[1];
+          const line = new fabric.Line([x1, y1, x2, y2], {
+            stroke,
+            strokeWidth: el.strokeWidth || 2,
+            strokeDashArray: dashArray,
+            opacity,
+          });
+          canvas.add(line);
+          break;
+        }
+        case 'freedraw': {
+          const pts = Array.isArray(el.points) ? el.points.map(([px, py]) => ({ x: el.x + px, y: el.y + py })) : [];
+          if (pts.length >= 2) {
+            const obj = new fabric.Polyline(pts, {
+              fill: 'transparent',
+              stroke,
+              strokeWidth: el.strokeWidth || 2,
+              strokeDashArray: dashArray,
+              opacity,
+            });
+            canvas.add(obj);
+          }
+          break;
+        }
+        case 'text': {
+          const obj = new fabric.Textbox(el.text || '', {
+            left: el.x,
+            top: el.y,
+            width: el.width || undefined,
+            fill: stroke,
+            fontSize: el.fontSize || 20,
+            fontFamily: mapFont(el.fontFamily),
+            textAlign: el.textAlign || 'left',
+            opacity,
+            angle: angleDeg,
+            originX: 'left',
+            originY: 'top',
+          });
+          canvas.add(obj);
+          break;
+        }
+        case 'arrow': {
+          const p0 = (el.points && el.points[0]) || [0, 0];
+          const p1 = (el.points && el.points[1]) || [0, 0];
+          const x1 = el.x + p0[0];
+          const y1 = el.y + p0[1];
+          const x2 = el.x + p1[0];
+          const y2 = el.y + p1[1];
+          const line = new fabric.Line([x1, y1, x2, y2], {
+            stroke,
+            strokeWidth: el.strokeWidth || 2,
+            strokeDashArray: dashArray,
+            opacity,
+          });
+          if (el.endArrowhead === 'arrow' || el.startArrowhead === 'arrow') {
+            const parts = [line];
+            if (el.endArrowhead === 'arrow') parts.push(addArrowHead(x1, y1, x2, y2, stroke, strokeWidth));
+            if (el.startArrowhead === 'arrow') parts.push(addArrowHead(x2, y2, x1, y1, stroke, strokeWidth));
+            const group = new fabric.Group(parts, { subTargetCheck: true });
+            canvas.add(group);
+          } else {
+            canvas.add(line);
+          }
+          break;
+        }
+        default:
+          try { console.debug('[editor] unsupported excalidraw type:', el.type); } catch (_) {}
+          break;
+      }
+    });
+
+    canvas.renderAll();
+    return true;
+  } catch (err) {
+    console.error('Import Excalidraw -> Fabric failed:', err);
+    return false;
+  }
+}
+
 const Canvas = () => {
-  const { canvas, setCanvas, canvasRef, setActiveObject, saveToHistory, updateLayers, canvasSize, zoom, setZoom, backgroundColor, showGrid, canvasRotation, activeObject, undo, redo, isDrawingCustom, setIsDrawingCustom, customPath, setCustomPath, fillShapeWithImage } = useEditor();
+  const { canvas, setCanvas, canvasRef, setActiveObject, saveToHistory, updateLayers, canvasSize, zoom, setZoom, backgroundColor, showGrid, canvasRotation, activeObject, undo, redo, isDrawingCustom, setIsDrawingCustom, customPath, setCustomPath, fillShapeWithImage, createBoard, switchBoard, boards } = useEditor();
   const containerRef = useRef(null);
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
   const [cropDialog, setCropDialog] = useState({ open: false, imageObject: null });
@@ -100,8 +301,7 @@ const Canvas = () => {
       fabricCanvas.on('object:added', () => updateLayers());
       fabricCanvas.on('object:removed', () => updateLayers());
       
-      // Allow free movement - only prevent objects from completely disappearing
-      // No constraints on object movement - users can move objects freely
+
       
       // Right-click context menu
       const handleContextMenu = (e) => {
@@ -126,9 +326,184 @@ const Canvas = () => {
 
       setCanvas(fabricCanvas);
 
+      // After canvas initializes, handle payload from Mind Map
+      setTimeout(() => {
+        try {
+          // Load mindmap template if present
+          const templateRaw = localStorage.getItem('mindmap-template');
+          if (templateRaw) {
+            const template = JSON.parse(templateRaw);
+            if (template.timestamp && (Date.now() - template.timestamp < 60000)) { // 1 minute
+              const ok = importExcalidrawToFabric(fabricCanvas, template);
+              if (ok) {
+                updateLayers();
+                saveToHistory();
+                toast.success('Loaded mindmap as template');
+                localStorage.removeItem('mindmap-template');
+                return;
+              }
+            }
+          }
+
+          // Load Excalidraw scene (editable) if present
+          const sceneKeys = ['excali-save', 'handoff:excalidrawSceneToEditor', 'excalidraw-local-save'];
+          for (const key of sceneKeys) {
+            const alreadyImported = sessionStorage.getItem(`imported:${key}`);
+            const raw = window.localStorage.getItem(key);
+            if (raw && !alreadyImported) {
+              try {
+                const scene = JSON.parse(raw);
+                const ok = importExcalidrawToFabric(fabricCanvas, scene);
+                if (ok) {
+                  sessionStorage.setItem(`imported:${key}`, '1');
+                  updateLayers();
+                  saveToHistory();
+                  toast.success('Loaded Excalidraw scene (editable)');
+                  // Do NOT remove keys automatically to avoid disappearance during debugging
+                } else {
+                  toast.error('Failed to load Excalidraw scene');
+                }
+              } catch (e) {
+                console.error('Invalid Excalidraw scene:', e);
+              }
+              break;
+            } else {
+              try { console.debug(`[editor] scene key not found or already imported: ${key}`); } catch (_) {}
+            }
+          }
+
+          // Load full board image as background
+          const rawImg = localStorage.getItem('handoff:mindmapImageToEditor');
+          if (rawImg) {
+            try { console.debug('[editor] consuming handoff:mindmapImageToEditor'); } catch (_) {}
+            const data = JSON.parse(rawImg || '{}');
+            const src = data && data.dataURL;
+            if (src) {
+              // Create a new board and switch to it
+              createBoard && createBoard();
+              // Wait a tick for state update before applying background
+              setTimeout(() => {
+                FabricImage.fromURL(src, { crossOrigin: 'anonymous' }).then((img) => {
+                  const canvasWidth = fabricCanvas.getWidth();
+                  const canvasHeight = fabricCanvas.getHeight();
+                  const scaleX = canvasWidth / img.width;
+                  const scaleY = canvasHeight / img.height;
+                  const scale = Math.max(scaleX, scaleY);
+                  img.set({
+                    left: 0,
+                    top: 0,
+                    scaleX: scale,
+                    scaleY: scale,
+                    selectable: true,
+                    evented: true,
+                    isBackgroundImage: true
+                  });
+                  const existingBg = fabricCanvas.getObjects().find(obj => obj.isBackgroundImage);
+                  if (existingBg) fabricCanvas.remove(existingBg);
+                  fabricCanvas.add(img);
+                  fabricCanvas.sendObjectToBack(img);
+                  fabricCanvas.discardActiveObject();
+                  fabricCanvas.renderAll();
+                  updateLayers();
+                  saveToHistory();
+                  toast.success('Board loaded from Mind Map');
+                  // Delay removal so you can see it in devtools briefly
+                  setTimeout(() => localStorage.removeItem('handoff:mindmapImageToEditor'), 5000);
+                });
+              }, 0);
+            }
+          }
+
+           // If pending export, poll briefly for the payload to appear
+           const pending = localStorage.getItem('handoff:mindmapImageToEditorPending');
+           if (pending && !rawImg) {
+             let attempts = 0;
+             const maxAttempts = 150; // ~15s at 100ms
+             const iv = setInterval(() => {
+               const ready = localStorage.getItem('handoff:mindmapImageToEditor');
+               attempts++;
+               if (ready) {
+                 clearInterval(iv);
+                 try { console.debug('[editor] clearing handoff:mindmapImageToEditorPending'); } catch (_) {}
+                 localStorage.removeItem('handoff:mindmapImageToEditorPending');
+                 const data = JSON.parse(ready || '{}');
+                 const src2 = data && data.dataURL;
+                 if (src2) {
+                   FabricImage.fromURL(src2, { crossOrigin: 'anonymous' }).then((img) => {
+                     const canvasWidth = fabricCanvas.getWidth();
+                     const canvasHeight = fabricCanvas.getHeight();
+                     const scaleX = canvasWidth / img.width;
+                     const scaleY = canvasHeight / img.height;
+                     const scale = Math.max(scaleX, scaleY);
+                     img.set({
+                       left: 0,
+                       top: 0,
+                       scaleX: scale,
+                       scaleY: scale,
+                       selectable: true,
+                       evented: true,
+                       isBackgroundImage: true
+                     });
+                     const existingBg = fabricCanvas.getObjects().find(obj => obj.isBackgroundImage);
+                     if (existingBg) fabricCanvas.remove(existingBg);
+                     fabricCanvas.add(img);
+                     fabricCanvas.sendObjectToBack(img);
+                     fabricCanvas.discardActiveObject();
+                     fabricCanvas.renderAll();
+                     updateLayers();
+                     saveToHistory();
+                     toast.success('Board loaded from Mind Map');
+                    // Delay removal so you can see it in devtools briefly
+                    setTimeout(() => localStorage.removeItem('handoff:mindmapImageToEditor'), 5000);
+                  });
+                 }
+               } else if (attempts >= maxAttempts) {
+                 clearInterval(iv);
+                 localStorage.removeItem('handoff:mindmapImageToEditorPending');
+               }
+             }, 100);
+           }
+
+          const raw = localStorage.getItem('handoff:mindmapToEditor');
+          if (raw) {
+            localStorage.removeItem('handoff:mindmapToEditor');
+            const data = JSON.parse(raw || '{}');
+            const text = data && data.text ? String(data.text) : 'Mind Map Node';
+            const textbox = new fabric.Textbox(text, {
+              left: (fabricCanvas.getWidth() || 800) / 2 - 150,
+              top: (fabricCanvas.getHeight() || 600) / 2 - 25,
+              width: 300,
+              fontSize: 28,
+              fill: '#0f172a',
+              fontFamily: 'Arial',
+            });
+            fabricCanvas.add(textbox);
+            fabricCanvas.setActiveObject(textbox);
+            fabricCanvas.renderAll();
+            updateLayers();
+            saveToHistory();
+            toast.success('Added from Mind Map');
+          }
+        } catch (_) {}
+      }, 0);
+
+      // Observe localStorage changes across tabs to detect deletions
+      try {
+        const handler = (e) => {
+          if (!e || !e.key) return;
+          if (e.key.indexOf('excali') >= 0 || e.key.indexOf('handoff:') === 0) {
+            try { console.debug('[editor] storage change', { key: e.key, old: !!e.oldValue, new: !!e.newValue }); } catch (_) {}
+          }
+        };
+        window.addEventListener('storage', handler);
+        // Remove on dispose below
+        (fabricCanvas)._storageHandler = handler;
+      } catch (_) {}
+
       return () => {
         fabricCanvas.wrapperEl?.removeEventListener('contextmenu', handleContextMenu);
         fabricCanvas.wrapperEl?.removeEventListener('mousedown', handleClick);
+        try { if ((fabricCanvas)._storageHandler) window.removeEventListener('storage', (fabricCanvas)._storageHandler); } catch (_) {}
         fabricCanvas.dispose();
       };
     }

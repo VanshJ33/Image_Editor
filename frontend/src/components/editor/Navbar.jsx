@@ -28,6 +28,20 @@ const Navbar = () => {
     }
   };
 
+  const handleSendToMindMap = () => {
+    try {
+      if (!canvas) return;
+      const obj = canvas.getActiveObject();
+      const payload = obj && obj.type === 'textbox'
+        ? { source: 'editor', kind: 'text', text: obj.text, fill: obj.fill || '#0f172a' }
+        : { source: 'editor', kind: 'shape', label: (obj && obj.type) || 'Design Element' };
+      localStorage.setItem('handoff:editorToMindmap', JSON.stringify(payload));
+      navigate('/mindmapping');
+    } catch (e) {
+      toast.error('Failed to send to Mind Map');
+    }
+  };
+
   const handleSave = () => {
     if (canvas) {
       const json = JSON.stringify(canvas.toJSON());
@@ -118,6 +132,10 @@ const Navbar = () => {
         </div>
 
         <div className="flex items-center gap-2">
+          <Button onClick={handleSendToMindMap} variant="outline" size="sm" className="gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
+            <Layers className="w-4 h-4" />
+            Send to Mind Map
+          </Button>
           <Button onClick={handleNew} variant="outline" size="sm" className="gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
             <Plus className="w-4 h-4" />
             New
