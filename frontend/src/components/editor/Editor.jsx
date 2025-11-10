@@ -1,5 +1,5 @@
 import React from 'react';
-import { EditorProvider } from '../../contexts/EditorContext';
+import { EditorProvider } from '../../contexts/EditorContext.tsx';
 import Navbar from './Navbar';
 import BoardTabs from './BoardTabs';
 import LeftSidebar from './LeftSidebar';

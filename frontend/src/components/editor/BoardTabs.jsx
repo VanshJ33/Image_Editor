@@ -3,7 +3,7 @@ import { motion } from 'framer-motion';
 import { Plus, X, FileText, Copy, MoreHorizontal } from 'lucide-react';
 import { Button } from '../ui/button';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
-import { useEditor } from '../../contexts/EditorContext';
+import { useEditor } from '../../contexts/EditorContext.tsx';
 
 const BoardTabs = () => {
   const { boards, activeBoard, createBoard, switchBoard, closeBoard, duplicateBoard } = useEditor();

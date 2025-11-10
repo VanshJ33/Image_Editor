@@ -11,11 +11,33 @@ html, body, #root, .App {
 }
 
 button {
-    transition: background-color 0.2s, border-color 0.2s, color 0.2s, opacity 0.2s;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+    will-change: transform;
+}
+
+button:active {
+    transform: scale(0.98);
 }
 
 input, textarea {
     transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+/* Smooth canvas interactions */
+canvas {
+    transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+    image-rendering: -webkit-optimize-contrast;
+    image-rendering: crisp-edges;
+}
+
+/* Smooth scrolling */
+* {
+    scroll-behavior: smooth;
+}
+
+/* Better performance for animations */
+.relative, .absolute, .fixed {
+    will-change: transform;
 }
 
 .canvas-container {

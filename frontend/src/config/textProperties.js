@@ -1,13 +1,7 @@
 // Text Properties Configuration
 import * as fabric from 'fabric';
 
-export interface SpacingPreset {
-  name: string;
-  value: number;
-  label: string;
-}
-
-export const textSpacingPresets: SpacingPreset[] = [
+export const textSpacingPresets = [
   { name: 'Ultra Tight', value: -150, label: 'Ultra Tight' },
   { name: 'Condensed', value: -100, label: 'Condensed' },
   { name: 'Tight', value: -50, label: 'Tight Spacing' },
@@ -18,22 +12,7 @@ export const textSpacingPresets: SpacingPreset[] = [
   { name: 'Mega Wide', value: 400, label: 'Mega Wide' }
 ];
 
-export interface EffectProperties {
-  shadow?: any;
-  stroke?: string;
-  strokeWidth?: number;
-  backgroundColor?: string;
-  fill?: string | any;
-  opacity?: number;
-  fontFamily?: string;
-}
-
-export interface EffectPreset {
-  name: string;
-  properties: EffectProperties;
-}
-
-export const textEffectPresets: Record<string, EffectPreset> = {
+export const textEffectPresets = {
   none: {
     name: 'None',
     properties: {
@@ -85,12 +64,12 @@ export const defaultTextProperties = {
 };
 
 // Export key types and helper functions
-export const applyTextEffect = (textObject: any, effectName: string): void => {
+export const applyTextEffect = (textObject, effectName) => {
   const effect = textEffectPresets[effectName];
   if (!effect || !textObject) return;
 
   Object.keys(effect.properties).forEach(key => {
-    const value = (effect.properties as any)[key];
+    const value = effect.properties[key];
 
     if (key === 'shadow') {
       if (value) {
@@ -109,7 +88,6 @@ export const applyTextEffect = (textObject: any, effectName: string): void => {
         textObject.initDimensions();
       }
       const width = Math.max(1, Math.floor(textObject.width || 200));
-      const height = Math.max(1, Math.floor(textObject.height || textObject.fontSize || 100));
       const coords = value.coords || { x1: 0, y1: 0, x2: width, y2: 0 };
 
       const gradient = new fabric.Gradient({
@@ -122,7 +100,7 @@ export const applyTextEffect = (textObject: any, effectName: string): void => {
           r1: coords.r1,
           r2: coords.r2
         },
-        colorStops: (value.colorStops || []).map((s: any) => ({ offset: s.offset, color: s.color }))
+        colorStops: (value.colorStops || []).map((s) => ({ offset: s.offset, color: s.color }))
       });
       textObject.set('fill', gradient);
     } else {
@@ -133,12 +111,7 @@ export const applyTextEffect = (textObject: any, effectName: string): void => {
   textObject.set('dirty', true);
 };
 
-export interface HeadingPreset {
-  name: string;
-  properties: any;
-}
-
-export const textHeadingPresets: Record<string, HeadingPreset> = {
+export const textHeadingPresets = {
   heading: {
     name: 'Heading',
     properties: {
@@ -171,7 +144,7 @@ export const textHeadingPresets: Record<string, HeadingPreset> = {
   }
 };
 
-export const textCurvePresets: Record<string, any> = {
+export const textCurvePresets = {
   arc: {
     name: 'Arc',
     properties: {
@@ -193,7 +166,7 @@ export const textCurvePresets: Record<string, any> = {
   }
 };
 
-export const applyCurvePreset = (textObject: any, curveName: string): void => {
+export const applyCurvePreset = (textObject, curveName) => {
   const preset = textCurvePresets[curveName];
   if (!preset || !textObject) return;
 
@@ -212,13 +185,13 @@ export const applyCurvePreset = (textObject: any, curveName: string): void => {
   });
 };
 
-export const applySpacingPreset = (textObject: any, presetName: string): void => {
+export const applySpacingPreset = (textObject, presetName) => {
   const preset = textSpacingPresets.find(p => p.name === presetName);
   if (preset && textObject) {
     textObject.set('charSpacing', preset.value);
   }
 };
 
-export const createCurvedTextGroup = (textString: string, curveName: string, options: any = {}): any => {
+export const createCurvedTextGroup = (textString, curveName, options = {}) => {
   return null; // Placeholder implementation
 };
