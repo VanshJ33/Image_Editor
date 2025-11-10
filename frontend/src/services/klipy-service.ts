@@ -138,10 +138,11 @@ class KlipyService {
           // For main URL, prefer appropriate format based on type
           if (!url) {
             if (type === 'gif') {
+              // For GIFs, prioritize actual GIF format to maintain animation
               url = item.file[size].gif?.url || item.file[size].webp?.url || item.file[size].mp4?.url || '';
             } else if (type === 'clip') {
-              // For clips, use jpg thumbnail since mp4 won't display as image
-              url = item.file[size].jpg?.url || item.file[size].webp?.url || item.file[size].gif?.url || '';
+              // For clips, prefer GIF for animation, fallback to static formats
+              url = item.file[size].gif?.url || item.file[size].webp?.url || item.file[size].jpg?.url || '';
             } else {
               url = item.file[size].webp?.url || item.file[size].gif?.url || item.file[size].jpg?.url || '';
             }
@@ -153,8 +154,8 @@ class KlipyService {
     
     // Handle clips structure: file.gif, file.webp, file.mp4 (no nested sizes)
     if ((!thumbnail || !url) && item.file && !item.file.hd && !item.file.md) {
-      if (type === 'clip') {
-        // For clips, prefer gif for thumbnail and gif for URL (since it's animated)
+      if (type === 'clip' || type === 'gif') {
+        // For clips and GIFs, prefer gif format to maintain animation
         thumbnail = item.file.gif || item.file.webp || '';
         url = item.file.gif || item.file.webp || '';
       } else {

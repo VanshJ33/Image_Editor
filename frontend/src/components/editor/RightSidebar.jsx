@@ -15,6 +15,7 @@ import { allGoogleFonts, loadGoogleFont, searchFonts } from '../../utils/googleF
 import { filterPresets } from '../../config/filters';
 import { textEffectPresets, applyTextEffect } from '../../config/textProperties';
 import { shapeStylePresets, shapeBorderPresets, applyShapeStyle, applyBorderPreset, shadowPresets, applyShadowToShape } from '../../config/shapeProperties';
+import { colorToHex } from '../../lib/utils';
 
 const LayerItem = ({ layer, index, selectedLayers, selectLayer, toggleLayerVisibility, toggleLayerLock, expandedGroups, toggleGroupExpansion, reorderLayers, ungroupLayer }) => {
   const isExpanded = expandedGroups.has(layer.id);
@@ -176,8 +177,8 @@ const RightSidebar = () => {
   useEffect(() => {
     if (activeObject) {
       const newProperties = {
-        fill: activeObject.fill || '#000000',
-        stroke: activeObject.stroke || '#000000',
+        fill: colorToHex(activeObject.fill),
+        stroke: colorToHex(activeObject.stroke),
         strokeWidth: activeObject.strokeWidth || 0,
         opacity: (activeObject.opacity || 1) * 100,
         fontSize: activeObject.fontSize || 32,

@@ -7,6 +7,7 @@ import CropDialog from './CropDialog';
 import { toast } from 'sonner';
 import * as fabric from 'fabric';
 import { ActiveSelection } from 'fabric';
+import AnimatedGifHandler from '../../utils/animated-gif-handler';
 
 // Minimal importer: Excalidraw -> Fabric objects (ellipse, text, arrow)
 function importExcalidrawToFabric(canvas, scene) {
@@ -210,8 +211,9 @@ function importExcalidrawToFabric(canvas, scene) {
 }
 
 const Canvas = () => {
-  const { canvas, setCanvas, canvasRef, setActiveObject, saveToHistory, updateLayers, canvasSize, zoom, setZoom, backgroundColor, showGrid, canvasRotation, activeObject, undo, redo, isDrawingCustom, setIsDrawingCustom, customPath, setCustomPath, fillShapeWithImage, createBoard, switchBoard, boards } = useEditor();
+  const { canvas, setCanvas, canvasRef, setActiveObject, saveToHistory, updateLayers, canvasSize, zoom, setZoom, backgroundColor, showGrid, canvasRotation, activeObject, undo, redo, isDrawingCustom, setIsDrawingCustom, customPath, setCustomPath, fillShapeWithImage, createBoard, switchBoard, boards, setGifHandler } = useEditor();
   const containerRef = useRef(null);
+  const gifHandlerRef = useRef(null);
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
   const [cropDialog, setCropDialog] = useState({ open: false, imageObject: null });
 
@@ -259,6 +261,9 @@ const Canvas = () => {
           hasControls: true,
           hasBorders: true
         });
+        
+
+        
         fabricCanvas.renderAll();
         setActiveObject(obj);
       });
@@ -280,6 +285,9 @@ const Canvas = () => {
           hasControls: true,
           hasBorders: true
         });
+        
+
+        
         fabricCanvas.renderAll();
         setActiveObject(obj);
       });
@@ -325,6 +333,11 @@ const Canvas = () => {
       fabricCanvas.wrapperEl.addEventListener('mousedown', handleClick);
 
       setCanvas(fabricCanvas);
+
+      // Initialize GIF handler
+      const gifHandler = new AnimatedGifHandler(fabricCanvas);
+      gifHandlerRef.current = gifHandler;
+      setGifHandler(gifHandler);
 
       // After canvas initializes, handle payload from Mind Map
       setTimeout(() => {
@@ -504,6 +517,13 @@ const Canvas = () => {
         fabricCanvas.wrapperEl?.removeEventListener('contextmenu', handleContextMenu);
         fabricCanvas.wrapperEl?.removeEventListener('mousedown', handleClick);
         try { if ((fabricCanvas)._storageHandler) window.removeEventListener('storage', (fabricCanvas)._storageHandler); } catch (_) {}
+        
+        // Clean up GIF handler
+        if (gifHandlerRef.current) {
+          gifHandlerRef.current.destroy();
+          gifHandlerRef.current = null;
+        }
+        
         fabricCanvas.dispose();
       };
     }

@@ -10,9 +10,10 @@ import { FabricImage } from 'fabric';
 import { toast } from 'sonner';
 import stickerService from '../../services/sticker-service';
 import klipyService from '../../services/klipy-service';
+import { isGifUrl } from '../../utils/gif-utils';
 
 const StickersPanel = ({ isOpen, onClose }) => {
-  const { canvas, saveToHistory, updateLayers } = useEditor();
+  const { canvas, saveToHistory, updateLayers, gifHandler } = useEditor();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('');
   const [activeTab, setActiveTab] = useState('local');
@@ -109,50 +110,75 @@ const StickersPanel = ({ isOpen, onClose }) => {
 
   // Add sticker to canvas
   const addStickerToCanvas = async (sticker) => {
-    if (!canvas) return;
+    if (!canvas) {
+      toast.error('Canvas not ready');
+      return;
+    }
 
     try {
-      let imageUrl;
-      
-      if (sticker.source === 'local') {
-        // For local SVG stickers, use the data URL
-        imageUrl = sticker.thumbnail;
-      } else if (sticker.source === 'klipy') {
-        // For KLIPY items, use the thumbnail or url
-        imageUrl = sticker.thumbnail || sticker.url;
-      } else {
-        // For external stickers, use the thumbnail or svg URL
-        imageUrl = sticker.thumbnail || sticker.svg;
+      const imageUrl = sticker.url || sticker.thumbnail;
+      if (!imageUrl) {
+        toast.error('No image URL found');
+        return;
       }
 
-      const img = await FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' });
+      const isGif = isGifUrl(imageUrl) || sticker.type === 'gif' || sticker.type === 'clip';
       
-      // Scale to reasonable size
-      const maxSize = 150;
-      const scale = Math.min(maxSize / img.width, maxSize / img.height);
-      
-      img.set({
-        left: canvas.width / 2 - (img.width * scale) / 2,
-        top: canvas.height / 2 - (img.height * scale) / 2,
-        scaleX: scale,
-        scaleY: scale,
-        cornerStyle: 'circle',
-        cornerSize: 12,
-        transparentCorners: false,
-        cornerColor: '#4f46e5',
-        borderColor: '#4f46e5'
-      });
-
-      canvas.add(img);
-      canvas.setActiveObject(img);
-      canvas.renderAll();
-      updateLayers();
-      saveToHistory();
-      
-      toast.success(`${sticker.name} added to canvas!`);
+      if (isGif && gifHandler) {
+        // Use GIF handler for animated GIFs
+        // For GIFs, prefer the actual URL over thumbnail
+        const gifUrl = sticker.url || sticker.thumbnail || imageUrl;
+        console.log('Adding GIF to canvas:', { gifUrl, sticker, isGif, hasHandler: !!gifHandler });
+        
+        const centerX = canvas.getWidth() / 2;
+        const centerY = canvas.getHeight() / 2;
+        
+        try {
+          const gifObj = await gifHandler.addAnimatedGif(gifUrl, {
+            left: centerX - 100,
+            top: centerY - 100,
+            scaleX: 1,
+            scaleY: 1,
+            selectable: true,
+            evented: true
+          });
+          
+          console.log('GIF object created:', gifObj);
+          canvas.setActiveObject(gifObj);
+          canvas.renderAll();
+          saveToHistory();
+          updateLayers();
+          toast.success('GIF added to canvas');
+        } catch (gifError) {
+          console.error('Error adding GIF:', gifError);
+          toast.error('Failed to add GIF: ' + (gifError.message || 'Unknown error'));
+        }
+      } else {
+        // Use standard Fabric image for static images
+        const img = await FabricImage.fromURL(imageUrl, { 
+          crossOrigin: 'anonymous' 
+        });
+        
+        const centerX = canvas.getWidth() / 2;
+        const centerY = canvas.getHeight() / 2;
+        
+        img.set({
+          left: centerX - (img.width || 200) / 2,
+          top: centerY - (img.height || 200) / 2,
+          selectable: true,
+          evented: true
+        });
+        
+        canvas.add(img);
+        canvas.setActiveObject(img);
+        canvas.renderAll();
+        saveToHistory();
+        updateLayers();
+        toast.success('Image added to canvas');
+      }
     } catch (error) {
-      console.error('Failed to add sticker:', error);
-      toast.error('Failed to add sticker');
+      console.error('Failed to add sticker to canvas:', error);
+      toast.error('Failed to add image to canvas');
     }
   };
 
@@ -355,7 +381,10 @@ const StickersPanel = ({ isOpen, onClose }) => {
                         transition={{ delay: index * 0.05 }}
                         whileHover={{ scale: 1.05 }}
                         whileTap={{ scale: 0.95 }}
-                        onClick={() => addStickerToCanvas(item)}
+                        onClick={() => {
+                          console.log('🖱️ CLICKED!', item.name);
+                          addStickerToCanvas(item);
+                        }}
                         className="relative aspect-square bg-slate-50 dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 cursor-pointer transition-all duration-200 p-2 group"
                       >
                         <div className="w-full h-full flex items-center justify-center">

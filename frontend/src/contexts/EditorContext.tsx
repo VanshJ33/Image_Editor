@@ -45,6 +45,7 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const isInitialized = useRef<boolean>(false);
   const [isDrawingCustom, setIsDrawingCustom] = useState<boolean>(false);
   const [customPath, setCustomPath] = useState<any[]>([]);
+  const [gifHandler, setGifHandler] = useState<any>(null);
   // Initialize history when canvas is first set
   useEffect(() => {
     if (canvas && !isInitialized.current) {
@@ -1144,7 +1145,9 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     backgroundOpacity,
     setBackgroundOpacity,
     applyTemplateContrast,
-    applyBackgroundOpacity
+    applyBackgroundOpacity,
+    gifHandler,
+    setGifHandler
   };
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;

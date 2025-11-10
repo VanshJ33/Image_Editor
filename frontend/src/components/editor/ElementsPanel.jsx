@@ -10,9 +10,10 @@ import { FabricImage, Path, Circle, Rect, Polygon, Textbox } from 'fabric';
 import { toast } from 'sonner';
 import { stickerLibrary, getAllStickers, stickerCategories } from '../../data/stickers';
 import klipyService from '../../services/klipy-service';
+import { isGifUrl } from '../../utils/gif-utils';
 
 const ElementsPanel = () => {
-  const { canvas, saveToHistory, updateLayers } = useEditor();
+  const { canvas, saveToHistory, updateLayers, gifHandler } = useEditor();
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [activeTab, setActiveTab] = useState('local');
@@ -116,18 +117,38 @@ const ElementsPanel = () => {
       if (sticker.source === 'klipy') {
         // Handle KLIPY items
         const imageUrl = sticker.thumbnail || sticker.url;
-        const img = await FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' });
+        const isGif = isGifUrl(imageUrl) || sticker.type === 'gif' || sticker.type === 'clip';
         
-        const maxSize = 150;
-        const scale = Math.min(maxSize / img.width, maxSize / img.height);
-        
-        fabricObject = img;
-        fabricObject.set({
-          left: canvas.width / 2 - (img.width * scale) / 2,
-          top: canvas.height / 2 - (img.height * scale) / 2,
-          scaleX: scale,
-          scaleY: scale,
-        });
+        if (isGif && gifHandler) {
+          // Use GIF handler for animated GIFs
+          const centerX = canvas.width / 2;
+          const centerY = canvas.height / 2;
+          
+          fabricObject = await gifHandler.addAnimatedGif(imageUrl, {
+            left: centerX - 75,
+            top: centerY - 75,
+            scaleX: 1,
+            scaleY: 1,
+            selectable: true,
+            evented: true
+          });
+        } else {
+          // Use standard Fabric image for static images
+          const img = await FabricImage.fromURL(imageUrl, { crossOrigin: 'anonymous' });
+          
+          const maxSize = 150;
+          const scale = Math.min(maxSize / img.width, maxSize / img.height);
+          
+          fabricObject = img;
+          fabricObject.set({
+            left: canvas.width / 2 - (img.width * scale) / 2,
+            top: canvas.height / 2 - (img.height * scale) / 2,
+            scaleX: scale,
+            scaleY: scale,
+            selectable: true,
+            evented: true
+          });
+        }
       } else if (sticker.type === 'emoji') {
         // Create emoji as text object
         fabricObject = new Textbox(sticker.emoji, {
@@ -163,15 +184,20 @@ const ElementsPanel = () => {
         throw new Error('Invalid sticker data');
       }
 
-      fabricObject.set({
-        cornerStyle: 'circle',
-        cornerSize: 12,
-        transparentCorners: false,
-        cornerColor: '#4f46e5',
-        borderColor: '#4f46e5',
-      });
-
-      canvas.add(fabricObject);
+      // Only set corner properties if not a GIF (GIFs are already added by the handler)
+      const isGifObject = fabricObject.isAnimatedGif;
+      
+      if (!isGifObject) {
+        fabricObject.set({
+          cornerStyle: 'circle',
+          cornerSize: 12,
+          transparentCorners: false,
+          cornerColor: '#4f46e5',
+          borderColor: '#4f46e5',
+        });
+        canvas.add(fabricObject);
+      }
+      
       canvas.setActiveObject(fabricObject);
       canvas.renderAll();
       updateLayers();

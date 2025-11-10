@@ -16,6 +16,7 @@ import { loadGoogleFont } from '../../utils/googleFonts';
 import { templates } from '../../data/templates';
 import { canvaTemplates } from '../../data/canvaTemplates';
 import ElementsPanel from './ElementsPanel';
+import { colorToHex } from '../../lib/utils';
 
 
 
@@ -1264,7 +1265,7 @@ const backgroundColors = [
 ];
 
   const getCurrentBackgroundColor = () => {
-    if (!canvas) return backgroundColor;
+    if (!canvas) return colorToHex(backgroundColor);
     
     const objects = canvas.getObjects();
     const bgObject = objects.find(obj => 
@@ -1275,10 +1276,10 @@ const backgroundColors = [
     );
     
     if (bgObject && typeof bgObject.fill === 'string') {
-      return bgObject.fill;
+      return colorToHex(bgObject.fill);
     }
     
-    return canvas.backgroundColor || backgroundColor;
+    return colorToHex(canvas.backgroundColor || backgroundColor);
   };
 
   const handleBackgroundColor = (color) => {
