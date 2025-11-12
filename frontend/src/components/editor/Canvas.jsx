@@ -246,23 +246,60 @@ const Canvas = () => {
 
       fabricCanvas.on('selection:created', (e) => {
         const obj = e.selected[0];
-        obj.set({
-          cornerSize: 12,
-          cornerStyle: 'rect',
-          cornerColor: '#4f46e5',
-          cornerStrokeColor: '#ffffff',
-          borderColor: '#4f46e5',
-          borderScaleFactor: 2,
-          transparentCorners: false,
-          touchCornerSize: 16,
-          rotatingPointOffset: 40,
-          lockScalingFlip: true,
-          lockUniScaling: false,
-          hasControls: true,
-          hasBorders: true
-        });
-        
-
+        // Don't show selection border box for GIF objects, but keep resize handles
+        if (obj.isAnimatedGif) {
+          // Override the _renderBorders method to prevent selection box rendering
+          // But keep controls (handles) visible for resizing
+          if (!obj._renderBordersOverridden) {
+            obj._renderBorders = function(ctx) {
+              // Don't render borders/selection box for GIF objects
+              return;
+            };
+            // Also override _drawBorder to ensure no border is drawn
+            obj._drawBorder = function(ctx) {
+              // Don't draw border for GIF objects
+              return;
+            };
+            obj._renderBordersOverridden = true;
+          }
+          
+          obj.set({
+            opacity: 0,
+            borderColor: 'transparent',
+            borderScaleFactor: 0,
+            hasBorders: false,
+            // Ensure border is not drawn
+            strokeWidth: 0,
+            stroke: 'transparent',
+            // Enable controls (handles) for resizing
+            hasControls: true,
+            cornerColor: '#4f46e5',
+            cornerStrokeColor: '#ffffff',
+            cornerSize: 12,
+            cornerStyle: 'rect',
+            transparentCorners: false,
+            touchCornerSize: 16,
+            rotatingPointOffset: 40,
+            lockScalingFlip: true,
+            lockUniScaling: false
+          });
+        } else {
+          obj.set({
+            cornerSize: 12,
+            cornerStyle: 'rect',
+            cornerColor: '#4f46e5',
+            cornerStrokeColor: '#ffffff',
+            borderColor: '#4f46e5',
+            borderScaleFactor: 2,
+            transparentCorners: false,
+            touchCornerSize: 16,
+            rotatingPointOffset: 40,
+            lockScalingFlip: true,
+            lockUniScaling: false,
+            hasControls: true,
+            hasBorders: true
+          });
+        }
         
         fabricCanvas.renderAll();
         setActiveObject(obj);
@@ -270,23 +307,60 @@ const Canvas = () => {
 
       fabricCanvas.on('selection:updated', (e) => {
         const obj = e.selected[0];
-        obj.set({
-          cornerSize: 12,
-          cornerStyle: 'rect',
-          cornerColor: '#4f46e5',
-          cornerStrokeColor: '#ffffff',
-          borderColor: '#4f46e5',
-          borderScaleFactor: 2,
-          transparentCorners: false,
-          touchCornerSize: 16,
-          rotatingPointOffset: 40,
-          lockScalingFlip: true,
-          lockUniScaling: false,
-          hasControls: true,
-          hasBorders: true
-        });
-        
-
+        // Don't show selection border box for GIF objects, but keep resize handles
+        if (obj.isAnimatedGif) {
+          // Override the _renderBorders method to prevent selection box rendering
+          // But keep controls (handles) visible for resizing
+          if (!obj._renderBordersOverridden) {
+            obj._renderBorders = function(ctx) {
+              // Don't render borders/selection box for GIF objects
+              return;
+            };
+            // Also override _drawBorder to ensure no border is drawn
+            obj._drawBorder = function(ctx) {
+              // Don't draw border for GIF objects
+              return;
+            };
+            obj._renderBordersOverridden = true;
+          }
+          
+          obj.set({
+            opacity: 0,
+            borderColor: 'transparent',
+            borderScaleFactor: 0,
+            hasBorders: false,
+            // Ensure border is not drawn
+            strokeWidth: 0,
+            stroke: 'transparent',
+            // Enable controls (handles) for resizing
+            hasControls: true,
+            cornerColor: '#4f46e5',
+            cornerStrokeColor: '#ffffff',
+            cornerSize: 12,
+            cornerStyle: 'rect',
+            transparentCorners: false,
+            touchCornerSize: 16,
+            rotatingPointOffset: 40,
+            lockScalingFlip: true,
+            lockUniScaling: false
+          });
+        } else {
+          obj.set({
+            cornerSize: 12,
+            cornerStyle: 'rect',
+            cornerColor: '#4f46e5',
+            cornerStrokeColor: '#ffffff',
+            borderColor: '#4f46e5',
+            borderScaleFactor: 2,
+            transparentCorners: false,
+            touchCornerSize: 16,
+            rotatingPointOffset: 40,
+            lockScalingFlip: true,
+            lockUniScaling: false,
+            hasControls: true,
+            hasBorders: true
+          });
+        }
         
         fabricCanvas.renderAll();
         setActiveObject(obj);
@@ -351,7 +425,7 @@ const Canvas = () => {
               if (ok) {
                 updateLayers();
                 saveToHistory();
-                toast.success('Loaded mindmap as template');
+                // Loaded mindmap as template
                 localStorage.removeItem('mindmap-template');
                 return;
               }
@@ -371,10 +445,10 @@ const Canvas = () => {
                   sessionStorage.setItem(`imported:${key}`, '1');
                   updateLayers();
                   saveToHistory();
-                  toast.success('Loaded Excalidraw scene (editable)');
+                  // Loaded Excalidraw scene
                   // Do NOT remove keys automatically to avoid disappearance during debugging
                 } else {
-                  toast.error('Failed to load Excalidraw scene');
+                  // Failed to load Excalidraw scene
                 }
               } catch (e) {
                 console.error('Invalid Excalidraw scene:', e);
@@ -419,7 +493,7 @@ const Canvas = () => {
                   fabricCanvas.renderAll();
                   updateLayers();
                   saveToHistory();
-                  toast.success('Board loaded from Mind Map');
+                  // Board loaded from Mind Map
                   // Delay removal so you can see it in devtools briefly
                   setTimeout(() => localStorage.removeItem('handoff:mindmapImageToEditor'), 5000);
                 });
@@ -465,7 +539,7 @@ const Canvas = () => {
                      fabricCanvas.renderAll();
                      updateLayers();
                      saveToHistory();
-                     toast.success('Board loaded from Mind Map');
+                     // Board loaded from Mind Map
                     // Delay removal so you can see it in devtools briefly
                     setTimeout(() => localStorage.removeItem('handoff:mindmapImageToEditor'), 5000);
                   });
@@ -495,7 +569,7 @@ const Canvas = () => {
             fabricCanvas.renderAll();
             updateLayers();
             saveToHistory();
-            toast.success('Added from Mind Map');
+            // Added from Mind Map
           }
         } catch (_) {}
       }, 0);
@@ -641,9 +715,9 @@ const Canvas = () => {
       // Finish custom shape
       if (customPath.length >= 3) {
         setIsDrawingCustom(false);
-        toast.success('Custom shape finished. Click "Finish" to create.');
+        // Custom shape finished
       } else {
-        toast.error('Need at least 3 points to create a shape');
+        // Need at least 3 points to create a shape
       }
     };
 
@@ -729,7 +803,7 @@ const Canvas = () => {
           canvas.renderAll();
           updateLayers();
           saveToHistory();
-          toast.success('Object duplicated');
+          // Object duplicated
         });
         break;
         
@@ -738,7 +812,7 @@ const Canvas = () => {
         canvas.renderAll();
         updateLayers();
         saveToHistory();
-        toast.success('Object deleted');
+        // Object deleted
         break;
         
       case 'lock':
@@ -748,14 +822,14 @@ const Canvas = () => {
         });
         canvas.renderAll();
         updateLayers();
-        toast.success(activeObject.selectable ? 'Object unlocked' : 'Object locked');
+        // Object lock toggled
         break;
         
       case 'visibility':
         activeObject.set('visible', !activeObject.visible);
         canvas.renderAll();
         updateLayers();
-        toast.success(activeObject.visible ? 'Object shown' : 'Object hidden');
+        // Object visibility toggled
         break;
         
       case 'bringToFront':
@@ -763,7 +837,7 @@ const Canvas = () => {
         canvas.renderAll();
         updateLayers();
         saveToHistory();
-        toast.success('Brought to front');
+        // Brought to front
         break;
         
       case 'sendToBack':
@@ -771,28 +845,28 @@ const Canvas = () => {
         canvas.renderAll();
         updateLayers();
         saveToHistory();
-        toast.success('Sent to back');
+        // Sent to back
         break;
         
       case 'flipHorizontal':
         activeObject.set('flipX', !activeObject.flipX);
         canvas.renderAll();
         saveToHistory();
-        toast.success('Flipped horizontally');
+        // Flipped horizontally
         break;
         
       case 'flipVertical':
         activeObject.set('flipY', !activeObject.flipY);
         canvas.renderAll();
         saveToHistory();
-        toast.success('Flipped vertically');
+        // Flipped vertically
         break;
         
       case 'rotate90':
         activeObject.set('angle', (activeObject.angle || 0) + 90);
         canvas.renderAll();
         saveToHistory();
-        toast.success('Rotated 90°');
+        // Rotated 90°
         break;
         
         
@@ -826,7 +900,7 @@ const Canvas = () => {
             canvas.renderAll();
             updateLayers();
             saveToHistory();
-            toast.success('Set as background');
+            // Set as background
           });
         }
         break;
@@ -836,7 +910,7 @@ const Canvas = () => {
           activeObject.enterEditing();
           activeObject.selectAll();
           canvas.renderAll();
-          toast.success('Text editing mode activated');
+          // Text editing mode activated
         }
         break;
         
@@ -847,7 +921,7 @@ const Canvas = () => {
           activeObject.set('fill', randomColor);
           canvas.renderAll();
           saveToHistory();
-          toast.success('Text color changed');
+          // Text color changed
         }
         break;
         
@@ -855,7 +929,7 @@ const Canvas = () => {
         if (activeObject.type === 'image') {
           setCropDialog({ open: true, imageObject: activeObject });
           setContextMenu({ visible: false, x: 0, y: 0 });
-          toast.success('Crop mode activated');
+          // Crop mode activated
         }
         break;
         

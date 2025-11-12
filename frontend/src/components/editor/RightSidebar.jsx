@@ -313,7 +313,7 @@ const RightSidebar = () => {
         });
       } catch (error) {
         console.error('Duplicate failed:', error);
-        toast.error('Failed to duplicate object');
+        // Failed to duplicate object
       }
     }
   };
@@ -603,7 +603,7 @@ const setAsBackground = () => {
                         applyTextEffect(activeObject, effect);
                         canvas.renderAll();
                         saveToHistory();
-                        toast.success(`${textEffectPresets[effect].name} applied!`);
+                        // Text effect applied
                       }}>
                         <SelectTrigger>
                           <SelectValue placeholder="Choose effect" />
@@ -627,7 +627,7 @@ const setAsBackground = () => {
                       applyShapeStyle(activeObject, style);
                       canvas.renderAll();
                       saveToHistory();
-                      toast.success(`${shapeStylePresets[style].name} applied!`);
+                      // Shape style applied
                     }}>
                       <SelectTrigger>
                         <SelectValue placeholder="Choose style" />
@@ -766,7 +766,7 @@ const setAsBackground = () => {
                       }
                       canvas.renderAll();
                       saveToHistory();
-                      toast.success('Shadow applied!');
+                      // Shadow applied
                     }}>
                       <SelectTrigger>
                         <SelectValue placeholder="Choose shadow" />
@@ -840,7 +840,7 @@ const setAsBackground = () => {
                                           canvas.renderAll();
                                           updateLayers();
                                           saveToHistory();
-                                          toast.success('Template image replaced successfully!');
+                                          // Template image replaced
                                         });
                                       };
                                       reader.readAsDataURL(file);

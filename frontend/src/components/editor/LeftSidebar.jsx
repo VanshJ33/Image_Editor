@@ -22,7 +22,7 @@ import { colorToHex } from '../../lib/utils';
 
 
 const LeftSidebar = () => {
-  const { canvas, saveToHistory, setCanvasSize, backgroundColor, setBackgroundColor, updateLayers, resizeCanvas, isDrawingCustom, setIsDrawingCustom, customPath, setCustomPath } = useEditor();
+  const { canvas, saveToHistory, setCanvasSize, backgroundColor, setBackgroundColor, updateLayers, resizeCanvas, isDrawingCustom, setIsDrawingCustom, customPath, setCustomPath, gifHandler } = useEditor();
   const [activeTab, setActiveTab] = useState('templates');
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
@@ -51,9 +51,19 @@ const LeftSidebar = () => {
       await loadGoogleFont(font);
     }
     
-    canvas.loadFromJSON(template.json, () => {
-      // After loading, mark template elements
+    // Set template loading flag to prevent object:added handler from processing GIFs
+    if (gifHandler && typeof gifHandler.setLoadingTemplate === 'function') {
+      gifHandler.setLoadingTemplate(true);
+    }
+    
+    canvas.loadFromJSON(template.json, async () => {
+      // After loading, mark template elements and ensure GIF objects have IDs
       canvas.getObjects().forEach(obj => {
+        // Ensure GIF objects have IDs (needed for animated elements)
+        if (obj.isAnimatedGif && !obj.id) {
+          obj.id = 'gif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+        }
+        
         if (obj.isTemplateImage || obj.isTemplateText) {
           // Add visual indicators for template elements
           obj.set({
@@ -67,6 +77,16 @@ const LeftSidebar = () => {
         }
       });
       
+      // Process GIFs after template is loaded (create animated elements)
+      if (gifHandler && typeof gifHandler.processGifsAfterTemplateLoad === 'function') {
+        await gifHandler.processGifsAfterTemplateLoad();
+      }
+      
+      // Reset template loading flag
+      if (gifHandler && typeof gifHandler.setLoadingTemplate === 'function') {
+        gifHandler.setLoadingTemplate(false);
+      }
+      
       canvas.renderAll();
       canvas.requestRenderAll();
       // Force canvas to fit viewport
@@ -76,7 +96,7 @@ const LeftSidebar = () => {
         updateLayers();
         saveToHistory();
         canvas.renderAll();
-        toast.success('Template loaded! Click on any element to customize it.');
+        // Template loaded
       }, 150);
 
     });
@@ -223,12 +243,12 @@ const LeftSidebar = () => {
   const startCustomShape = () => {
     setIsDrawingCustom(true);
     setCustomPath([]);
-    toast.info('Click on canvas to place points for your custom shape. Right-click to finish.');
+    // Custom shape mode activated
   };
 
   const finishCustomShape = () => {
     if (customPath.length < 3) {
-      toast.error('Custom shape needs at least 3 points');
+      // Custom shape needs at least 3 points
       return;
     }
     
@@ -263,7 +283,7 @@ const LeftSidebar = () => {
       
       setIsDrawingCustom(false);
       setCustomPath([]);
-      toast.success('Custom shape created!');
+      // Custom shape created
     }
   };
 
@@ -1509,9 +1529,9 @@ const backgroundColors = [
                           const height = parseInt(document.getElementById('custom-height').value);
                           if (canvas && width && height && width >= 100 && height >= 100) {
                             resizeCanvas(width, height);
-                            toast.success(`Canvas resized to ${width}×${height}`);
+                            // Canvas resized
                           } else {
-                            toast.error('Please enter valid dimensions (100-5000px)');
+                            // Invalid dimensions
                           }
                         }}
                         size="sm"

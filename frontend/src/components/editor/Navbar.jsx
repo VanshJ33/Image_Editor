@@ -13,18 +13,16 @@ import {
 } from '../ui/popover';
 
 const Navbar = () => {
-  const { canvas, undo, redo, zoom, setZoom, isDarkMode, setIsDarkMode, saveToHistory, showGrid, setShowGrid, activeObject, bringForward, sendBackward, copyObject, deleteObject, exportCanvas, duplicateObject, centerObject, resetCanvas, isLoading, rotateCanvas, history, historyStep } = useEditor();
+  const { canvas, undo, redo, zoom, setZoom, isDarkMode, setIsDarkMode, saveToHistory, showGrid, setShowGrid, activeObject, bringForward, sendBackward, copyObject, deleteObject, exportCanvas, duplicateObject, centerObject, resetCanvas, isLoading, rotateCanvas, history, historyStep, gifHandler } = useEditor();
   const location = useLocation();
   const navigate = useNavigate();
 
   const handleExport = async () => {
     try {
+      // Always export as PNG (static image with all elements including GIFs as static frames)
       await exportCanvas('png', 1);
-      toast.success('Design exported successfully!', {
-        icon: '📥'
-      });
     } catch (error) {
-      toast.error('Failed to export design');
+      // Export failed silently
     }
   };
 
@@ -38,7 +36,7 @@ const Navbar = () => {
       localStorage.setItem('handoff:editorToMindmap', JSON.stringify(payload));
       navigate('/mindmapping');
     } catch (e) {
-      toast.error('Failed to send to Mind Map');
+      // Failed to send to Mind Map
     }
   };
 
@@ -46,16 +44,14 @@ const Navbar = () => {
     if (canvas) {
       const json = JSON.stringify(canvas.toJSON());
       localStorage.setItem('canva-design', json);
-      toast.success('Design saved to local storage!');
+      // Design saved to local storage
     }
   };
 
   const handleNew = () => {
     if (window.confirm('Are you sure you want to create a new canvas? All unsaved changes will be lost.')) {
       resetCanvas();
-      toast.success('New canvas created!', {
-        icon: '✨'
-      });
+      // New canvas created
     }
   };
 
@@ -111,7 +107,7 @@ const Navbar = () => {
 
   const toggleGrid = () => {
     setShowGrid(!showGrid);
-    toast.success(showGrid ? 'Grid hidden' : 'Grid visible');
+    // Grid toggled
   };
 
   return (

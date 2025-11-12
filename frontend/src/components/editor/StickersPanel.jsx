@@ -41,7 +41,7 @@ const StickersPanel = ({ isOpen, onClose }) => {
         setStickers(results);
       } catch (error) {
         console.error('Search failed:', error);
-        toast.error('Failed to load stickers');
+        // Failed to load stickers
       } finally {
         setLoading(false);
       }
@@ -77,7 +77,7 @@ const StickersPanel = ({ isOpen, onClose }) => {
         setKlipyItems(results);
       } catch (error) {
         console.error('KLIPY search failed:', error);
-        toast.error('Failed to load media from KLIPY');
+        // Failed to load media from KLIPY
       } finally {
         setKlipyLoading(false);
       }
@@ -111,14 +111,14 @@ const StickersPanel = ({ isOpen, onClose }) => {
   // Add sticker to canvas
   const addStickerToCanvas = async (sticker) => {
     if (!canvas) {
-      toast.error('Canvas not ready');
+      // Canvas not ready
       return;
     }
 
     try {
       const imageUrl = sticker.url || sticker.thumbnail;
       if (!imageUrl) {
-        toast.error('No image URL found');
+        // No image URL found
         return;
       }
 
@@ -143,15 +143,31 @@ const StickersPanel = ({ isOpen, onClose }) => {
             evented: true
           });
           
-          console.log('GIF object created:', gifObj);
-          canvas.setActiveObject(gifObj);
-          canvas.renderAll();
-          saveToHistory();
-          updateLayers();
-          toast.success('GIF added to canvas');
+          console.log('GIF object created or found:', gifObj);
+          
+          // Only update history and show success if a new object was created
+          // (addAnimatedGif returns existing object if duplicate found)
+          const isNewObject = !canvas.getObjects().some(obj => 
+            obj.isAnimatedGif && 
+            obj.gifUrl === gifUrl && 
+            obj !== gifObj
+          );
+          
+          if (isNewObject) {
+            canvas.setActiveObject(gifObj);
+            canvas.renderAll();
+            saveToHistory();
+            updateLayers();
+            // GIF added to canvas
+          } else {
+            // Object already existed, just select it
+            canvas.setActiveObject(gifObj);
+            canvas.renderAll();
+            // GIF already on canvas
+          }
         } catch (gifError) {
           console.error('Error adding GIF:', gifError);
-          toast.error('Failed to add GIF: ' + (gifError.message || 'Unknown error'));
+          // Failed to add GIF
         }
       } else {
         // Use standard Fabric image for static images
@@ -174,11 +190,11 @@ const StickersPanel = ({ isOpen, onClose }) => {
         canvas.renderAll();
         saveToHistory();
         updateLayers();
-        toast.success('Image added to canvas');
+        // Image added to canvas
       }
     } catch (error) {
       console.error('Failed to add sticker to canvas:', error);
-      toast.error('Failed to add image to canvas');
+      // Failed to add image to canvas
     }
   };
 

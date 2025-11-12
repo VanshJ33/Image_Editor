@@ -196,30 +196,581 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [activeObject, canvas, saveToHistory]);
   
-  const exportCanvas = useCallback((format: string = 'png', quality: number = 1): string | undefined => {
-    if (canvas) {
+  const exportCanvas = useCallback(async (format: string = 'png', quality: number = 1): Promise<string | undefined> => {
+    if (!canvas) {
+      return undefined;
+    }
+    
       setIsLoading(true);
+      
+      // Check if we have GIFs that need special handling (declare outside try for catch block access)
+      const hasGifs = canvas.getObjects().some(obj => (obj as any).isAnimatedGif);
+      
       try {
-        const dataURL = canvas.toDataURL({
-          format: format as any,
-          quality: quality,
-          multiplier: 2 // Higher resolution export
+      // Ensure all objects are visible and rendered
+      const allObjects = canvas.getObjects();
+      console.log('Export: Total objects on canvas:', allObjects.length);
+      
+      // Make sure all objects are visible
+      allObjects.forEach((obj, index) => {
+        if (obj.visible === false) {
+          obj.set('visible', true);
+        }
+        if (obj.opacity === 0 || obj.opacity === undefined) {
+          obj.set('opacity', 1);
+        }
+        console.log(`Object ${index}:`, {
+          type: obj.type,
+          visible: obj.visible,
+          opacity: obj.opacity,
+          left: obj.left,
+          top: obj.top,
+          width: (obj as any).width,
+          height: (obj as any).height
+        });
+      });
+      
+      // Clear any active selection
+      canvas.discardActiveObject();
+      
+      // Force render
+      canvas.renderAll();
+      
+      // Wait a bit for render to complete
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      // Note: For animated GIF export, we'll handle it differently
+      // PNG format cannot be animated, so we'll export as animated GIF if there are GIFs
+      // For animated GIF export, we should NOT convert GIFs to static - keep them animated
+      // For PNG export, we'll convert them to static frames later
+      if (hasGifs && gifHandler) {
+        // Set exporting flag but don't convert to static yet
+        // We'll decide later based on export format
+        if (gifHandler && typeof gifHandler.setExporting === 'function') {
+          gifHandler.setExporting(true);
+        }
+        
+        // For now, don't convert to static - we'll do it only if PNG export is needed
+        // This allows animated GIF export to capture the actual animation
+      }
+      
+      // Final render before export
+      canvas.renderAll();
+      await new Promise(resolve => setTimeout(resolve, 200));
+      
+      console.log('About to export, objects:', canvas.getObjects().length);
+      
+      // Try to export directly first
+      let dataURL: string | undefined;
+      try {
+        dataURL = canvas.toDataURL({
+          format: 'png',
+          quality: 1,
+          multiplier: 2
         });
         
-        // Create download link
+        if (dataURL && dataURL !== 'data:,') {
+          console.log('Direct export succeeded, data URL length:', dataURL.length);
+        } else {
+          throw new Error('Direct export returned empty data URL');
+        }
+      } catch (exportError) {
+        console.error('Direct export failed (likely CORS):', exportError);
+        
+        // If direct export fails due to CORS, use the clean canvas approach
+        console.log('Using clean canvas approach for export...');
+        
+        try {
+        
+        // Serialize canvas to JSON
+        const canvasJSON = canvas.toJSON();
+        console.log('Canvas JSON objects:', canvasJSON.objects?.length || 0);
+        console.log('Canvas JSON structure:', {
+          version: canvasJSON.version,
+          objectsCount: canvasJSON.objects?.length || 0,
+          background: canvasJSON.backgroundColor,
+          width: canvasJSON.width,
+          height: canvasJSON.height
+        });
+        
+        // Convert all image URLs to data URLs with proper CORS handling
+        // This MUST happen before creating the temp canvas to avoid CORS issues
+        const convertImageUrls = async (obj: any): Promise<void> => {
+          // Skip GIF objects that are already handled separately
+          if (obj.isAnimatedGif) {
+            return;
+          }
+          
+          if (obj.type === 'image' && obj.src && !obj.src.startsWith('data:') && !obj.src.startsWith('blob:')) {
+            try {
+              console.log('Converting image URL to data URL:', obj.src.substring(0, 50));
+              
+              // Method 1: Try loading image with crossOrigin directly (works for Unsplash)
+              const img = new Image();
+              img.crossOrigin = 'anonymous';
+              
+              const converted = await new Promise<string>((resolve, reject) => {
+                const timeout = setTimeout(() => {
+                  reject(new Error('Image load timeout'));
+                }, 15000);
+                
+                img.onload = () => {
+                  clearTimeout(timeout);
+                  try {
+                    const tempCanvas = document.createElement('canvas');
+                    const ctx = tempCanvas.getContext('2d');
+                    if (!ctx) {
+                      reject(new Error('Could not get canvas context'));
+                      return;
+                    }
+                    tempCanvas.width = img.width;
+                    tempCanvas.height = img.height;
+                    ctx.drawImage(img, 0, 0);
+                    const dataURL = tempCanvas.toDataURL('image/png');
+                    resolve(dataURL);
+                  } catch (err) {
+                    reject(err);
+                  }
+                };
+                
+                img.onerror = () => {
+                  clearTimeout(timeout);
+                  reject(new Error('Failed to load image with crossOrigin'));
+                };
+                
+                // Try loading the image
+                img.src = obj.src;
+              }).catch(async (firstError) => {
+                console.log('Direct image load failed, trying fetch method:', firstError);
+                
+                // Method 2: Fetch as blob (works for most CORS-enabled images)
+                try {
+                  const response = await fetch(obj.src, {
+                    mode: 'cors',
+                    credentials: 'omit'
+                  });
+                  
+                  if (!response.ok) {
+                    throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                  }
+                  
+                  const blob = await response.blob();
+                  const blobUrl = URL.createObjectURL(blob);
+                  
+                  const img2 = new Image();
+                  return new Promise<string>((resolve, reject) => {
+                    const timeout2 = setTimeout(() => {
+                      URL.revokeObjectURL(blobUrl);
+                      reject(new Error('Blob image load timeout'));
+                    }, 15000);
+                    
+                    img2.onload = () => {
+                      clearTimeout(timeout2);
+                      try {
+                        const tempCanvas = document.createElement('canvas');
+                        const ctx = tempCanvas.getContext('2d');
+                        if (!ctx) {
+                          URL.revokeObjectURL(blobUrl);
+                          reject(new Error('Could not get canvas context'));
+                          return;
+                        }
+                        tempCanvas.width = img2.width;
+                        tempCanvas.height = img2.height;
+                        ctx.drawImage(img2, 0, 0);
+                        const dataURL = tempCanvas.toDataURL('image/png');
+                        URL.revokeObjectURL(blobUrl);
+                        resolve(dataURL);
+                      } catch (err) {
+                        URL.revokeObjectURL(blobUrl);
+                        reject(err);
+                      }
+                    };
+                    
+                    img2.onerror = () => {
+                      clearTimeout(timeout2);
+                      URL.revokeObjectURL(blobUrl);
+                      reject(new Error('Failed to load blob image'));
+                    };
+                    
+                    img2.src = blobUrl;
+                  });
+                } catch (fetchError) {
+                  console.warn('Fetch method also failed:', fetchError);
+                  throw fetchError;
+                }
+              });
+              
+              obj.src = converted;
+              console.log('Successfully converted image to data URL, length:', converted.length);
+            } catch (error) {
+              console.error('Failed to convert image URL:', error, obj.src);
+              // For critical images, we should fail the export
+              // But for now, continue and hope the temp canvas can handle it
+            }
+          }
+          
+          if (obj.objects && Array.isArray(obj.objects)) {
+            await Promise.all(obj.objects.map((o: any) => convertImageUrls(o)));
+          }
+        };
+        
+        console.log('Starting image URL conversion...');
+        if (canvasJSON.objects && Array.isArray(canvasJSON.objects)) {
+          await Promise.all(canvasJSON.objects.map((obj: any) => convertImageUrls(obj)));
+        }
+        console.log('Image URL conversion completed');
+        
+        // Create temporary canvas
+        const exportCanvas = document.createElement('canvas');
+        exportCanvas.width = canvas.width || 1080;
+        exportCanvas.height = canvas.height || 1080;
+        
+        const { Canvas } = await import('fabric');
+        const tempCanvas = new Canvas(exportCanvas, {
+          width: exportCanvas.width,
+          height: exportCanvas.height,
+          backgroundColor: canvas.backgroundColor || '#ffffff'
+        });
+        
+        // Load objects into temp canvas using loadFromJSON with proper callback handling
+        console.log('Loading objects into temp canvas, objects in JSON:', canvasJSON.objects?.length || 0);
+        
+        if (!canvasJSON.objects || canvasJSON.objects.length === 0) {
+          console.warn('No objects in JSON to load');
+          throw new Error('No objects in canvas JSON to export');
+        }
+        
+        // Try using loadFromJSON first (more reliable for full canvas state)
+        await new Promise<void>((resolve, reject) => {
+          const timeout = setTimeout(() => {
+            console.warn('loadFromJSON timeout, trying enlivenObjects fallback...');
+            // Fallback to enlivenObjects
+            try {
+              (fabric.util.enlivenObjects as any)(canvasJSON.objects, (fabricObjects: any[]) => {
+                console.log('Enlivened objects (fallback):', fabricObjects.length);
+                if (fabricObjects.length === 0) {
+                  reject(new Error('Failed to enliven objects from JSON'));
+                  return;
+                }
+                fabricObjects.forEach((obj) => {
+                  if (obj.visible === false) obj.set('visible', true);
+                  if (obj.opacity === 0 || obj.opacity === undefined) obj.set('opacity', 1);
+                  tempCanvas.add(obj);
+                });
+                tempCanvas.renderAll();
+                resolve(undefined);
+              });
+            } catch (fallbackError) {
+              reject(fallbackError);
+            }
+          }, 8000);
+          
+          try {
+            tempCanvas.loadFromJSON(canvasJSON, () => {
+              clearTimeout(timeout);
+              console.log('loadFromJSON callback executed');
+              
+              const loadedObjects = tempCanvas.getObjects();
+              console.log('Objects loaded via loadFromJSON:', loadedObjects.length);
+              
+              if (loadedObjects.length === 0) {
+                console.warn('loadFromJSON loaded 0 objects, trying enlivenObjects...');
+                // Fallback to enlivenObjects
+                try {
+                  (fabric.util.enlivenObjects as any)(canvasJSON.objects, (fabricObjects: any[]) => {
+                    console.log('Enlivened objects (fallback):', fabricObjects.length);
+                    if (fabricObjects.length === 0) {
+                      reject(new Error('Failed to enliven objects from JSON'));
+                      return;
+                    }
+                    fabricObjects.forEach((obj) => {
+                      if (obj.visible === false) obj.set('visible', true);
+                      if (obj.opacity === 0 || obj.opacity === undefined) obj.set('opacity', 1);
+                      tempCanvas.add(obj);
+                    });
+                    tempCanvas.renderAll();
+                    resolve(undefined);
+                  });
+                } catch (fallbackError) {
+                  reject(fallbackError);
+                }
+                return;
+              }
+              
+              // Ensure all objects are visible
+              loadedObjects.forEach((obj, index) => {
+                if (obj.visible === false) {
+                  obj.set('visible', true);
+                }
+                if (obj.opacity === 0 || obj.opacity === undefined) {
+                  obj.set('opacity', 1);
+                }
+                console.log(`Object ${index} loaded:`, {
+                  type: obj.type,
+                  visible: obj.visible,
+                  opacity: obj.opacity,
+                  left: obj.left,
+                  top: obj.top
+                });
+              });
+              
+              tempCanvas.renderAll();
+              resolve(undefined);
+            });
+          } catch (loadError) {
+            clearTimeout(timeout);
+            console.error('Error calling loadFromJSON:', loadError);
+            reject(loadError);
+          }
+        });
+        
+        // Wait for images to load
+        const allObjects = tempCanvas.getObjects();
+        const imageObjects = allObjects.filter(obj => obj.type === 'image');
+        console.log('Temp canvas image objects:', imageObjects.length);
+        
+        // Wait for all images to be ready
+        const imagePromises = imageObjects.map((imgObj: any) => {
+          return new Promise((resolve) => {
+            const imgElement = imgObj.getElement ? imgObj.getElement() : null;
+            if (imgElement && imgElement.tagName === 'IMG') {
+              if (imgElement.complete && imgElement.naturalWidth > 0) {
+                resolve(undefined);
+              } else {
+                imgElement.onload = () => resolve(undefined);
+                imgElement.onerror = () => resolve(undefined);
+                setTimeout(() => resolve(undefined), 3000);
+              }
+            } else {
+              // For data URLs, they should be ready immediately
+              resolve(undefined);
+            }
+          });
+        });
+        
+        await Promise.all(imagePromises);
+        
+        // Force multiple renders to ensure everything is drawn
+        tempCanvas.renderAll();
+        await new Promise(resolve => setTimeout(resolve, 300));
+        tempCanvas.renderAll();
+        await new Promise(resolve => setTimeout(resolve, 300));
+        tempCanvas.renderAll();
+        
+        const finalObjects = tempCanvas.getObjects();
+        console.log('Temp canvas ready for export, final object count:', finalObjects.length);
+        console.log('Object types:', finalObjects.map(obj => obj.type));
+        
+        if (finalObjects.length === 0) {
+          throw new Error('No objects were added to temp canvas');
+        }
+        
+        // Export from temp canvas
+        dataURL = exportCanvas.toDataURL('image/png');
+        
+        if (!dataURL || dataURL === 'data:,') {
+          throw new Error('Temp canvas export returned empty data URL');
+        }
+        
+        console.log('Clean canvas export succeeded, data URL length:', dataURL.length);
+        } catch (cleanCanvasError) {
+          console.error('Clean canvas export failed:', cleanCanvasError);
+          throw cleanCanvasError;
+        }
+      }
+      
+      if (!dataURL) {
+        console.error('Export failed: no data URL generated');
+        throw new Error('Export failed: no data URL generated');
+      }
+      
+      // For animated GIF export when GIFs are present
+      // PNG format cannot be animated, so we need to export as animated GIF
+      // Since GIFs are still animated (not converted to static), we can capture frames
+      if (hasGifs && gifHandler) {
+        try {
+          console.log('Starting animated GIF export...');
+          // Try to export as animated GIF
+          let GIF: any;
+          try {
+            const gifModule = await import('gif.js');
+            GIF = gifModule.default || gifModule;
+            if (!GIF) {
+              throw new Error('gif.js module not found');
+            }
+          } catch (importError) {
+            console.error('Failed to import gif.js:', importError);
+            throw new Error('gif.js library not available');
+          }
+          
+          // Use gif.js without workers to avoid worker script path issues
+          const gif = new GIF({
+            workers: 0, // Disable workers to avoid worker script path issues
+            quality: 10,
+            width: canvas.width || 1080,
+            height: canvas.height || 1080
+          });
+          
+          // Capture multiple frames as GIFs animate
+          // GIFs are still animated, so we can capture different frames
+          const frameCount = 20; // Number of frames to capture
+          const frameDelay = 100; // Delay between frames in ms
+          
+          for (let i = 0; i < frameCount; i++) {
+            // Wait for GIF animation to progress
+            await new Promise(resolve => setTimeout(resolve, frameDelay));
+            
+            // Render canvas to capture current frame with animated GIFs
+            canvas.renderAll();
+            await new Promise(resolve => setTimeout(resolve, 50));
+            
+            // Try to capture frame - this might fail due to CORS, so we'll handle it
+            let frameDataURL: string;
+            try {
+              frameDataURL = canvas.toDataURL({
+                format: 'png',
+                quality: 1,
+                multiplier: 1
+              });
+              
+              if (!frameDataURL || frameDataURL === 'data:,') {
+                throw new Error('Empty data URL');
+              }
+            } catch (frameError) {
+              console.warn('Frame capture failed (CORS), skipping frame:', frameError);
+              // Skip this frame if CORS blocks it
+              continue;
+            }
+            
+            // Convert data URL to image and add to GIF
+            const img = new Image();
+            await new Promise((resolve) => {
+              img.onload = () => {
+                gif.addFrame(img, { delay: frameDelay });
+                resolve(undefined);
+              };
+              img.onerror = () => {
+                console.warn('Failed to load frame image');
+                resolve(undefined); // Skip this frame
+              };
+              img.src = frameDataURL;
+            });
+          }
+          
+          // Generate animated GIF
+          await new Promise<void>((resolve, reject) => {
+            const timeout = setTimeout(() => {
+              reject(new Error('GIF generation timeout'));
+            }, 60000); // 60 second timeout
+            
+            gif.on('finished', (blob: Blob) => {
+              clearTimeout(timeout);
+              const gifUrl = URL.createObjectURL(blob);
         const link = document.createElement('a');
-        link.download = `design.${format}`;
+              link.download = `design.gif`;
+              link.href = gifUrl;
+              link.style.display = 'none';
+              document.body.appendChild(link);
+              link.click();
+              
+              setTimeout(() => {
+                document.body.removeChild(link);
+                URL.revokeObjectURL(gifUrl);
+              }, 100);
+              
+              resolve();
+            });
+            
+            gif.on('progress', (p: number) => {
+              console.log('GIF export progress:', Math.round(p * 100) + '%');
+            });
+            
+            gif.render();
+          });
+          
+          // Restore GIFs after export (they were never converted, so nothing to restore)
+          if (gifHandler && typeof gifHandler.setExporting === 'function') {
+            gifHandler.setExporting(false);
+          }
+          
+          console.log('Animated GIF export completed');
+          return dataURL;
+        } catch (gifError) {
+          console.warn('Failed to export as animated GIF, converting to static PNG:', gifError);
+          // Fall through to PNG export - convert GIFs to static first
+          if (gifHandler && typeof gifHandler.renderGifsForExport === 'function') {
+            await gifHandler.renderGifsForExport();
+            await new Promise(resolve => setTimeout(resolve, 500));
+            canvas.renderAll();
+            // Re-export as PNG
+            try {
+              dataURL = canvas.toDataURL({
+                format: 'png',
+                quality: 1,
+                multiplier: 2
+              });
+            } catch (pngError) {
+              // If still fails, use clean canvas approach
+              throw pngError;
+            }
+          }
+        }
+      } else if (hasGifs && gifHandler) {
+        // No animated GIF export, convert to static for PNG
+        if (gifHandler && typeof gifHandler.renderGifsForExport === 'function') {
+          await gifHandler.renderGifsForExport();
+          await new Promise(resolve => setTimeout(resolve, 500));
+          canvas.renderAll();
+        }
+      }
+      
+      // Restore GIFs if needed (for PNG export)
+      if (hasGifs && gifHandler && typeof gifHandler.restoreGifsAfterExport === 'function') {
+        await gifHandler.restoreGifsAfterExport();
+      }
+      if (gifHandler && typeof gifHandler.setExporting === 'function') {
+        gifHandler.setExporting(false);
+      }
+        
+      // Create download link for PNG
+      const link = document.createElement('a');
+      link.download = `design.png`;
         link.href = dataURL;
+      link.style.display = 'none';
         document.body.appendChild(link);
         link.click();
+      
+      setTimeout(() => {
         document.body.removeChild(link);
+      }, 100);
         
+      console.log('Export completed successfully');
         return dataURL;
+    } catch (error) {
+      console.error('Export failed with error:', error);
+      console.error('Error stack:', (error as Error).stack);
+      
+      // Restore GIFs if needed (even on error)
+      if (hasGifs && gifHandler && typeof gifHandler.restoreGifsAfterExport === 'function') {
+        try {
+          await gifHandler.restoreGifsAfterExport();
+        } catch (restoreError) {
+          console.error('Error restoring GIFs:', restoreError);
+        }
+      }
+      if (gifHandler && typeof gifHandler.setExporting === 'function') {
+        try {
+          gifHandler.setExporting(false);
+        } catch (setError) {
+          console.error('Error setting exporting flag:', setError);
+        }
+      }
+      
+      return undefined;
       } finally {
         setIsLoading(false);
       }
-    }
-  }, [canvas]);
+  }, [canvas, gifHandler]);
   
   const duplicateObject = useCallback(() => {
     if (activeObject && canvas) {

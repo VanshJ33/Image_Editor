@@ -203,10 +203,10 @@ const ElementsPanel = () => {
       updateLayers();
       saveToHistory();
 
-      toast.success(`${sticker.name} added!`);
+      // Sticker added
     } catch (err) {
       console.error('Add to canvas failed:', err);
-      toast.error('Failed to add sticker.');
+      // Failed to add sticker
     }
   };
 
