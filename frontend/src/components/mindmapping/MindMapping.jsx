@@ -1,12 +1,18 @@
 import React, { useEffect, useRef, useState } from "react";
 import { Excalidraw, exportToBlob } from "@excalidraw/excalidraw";
-import { Sparkles, Brain, Zap, Layers } from "lucide-react";
+import { Sparkles, Brain, Zap, Layers, CloudUpload, Save } from "lucide-react";
 import { useNavigate } from "react-router-dom";
+import OrganizationImageBar from "../editor/OrganizationImageBar";
+import { saveExcalidrawToOrganization } from "../../utils/excalidrawSave";
+import { toast } from "sonner";
 
-function MindMapping() {
+function MindMapping({ organizationName }) {
   const [theme, setTheme] = useState("dark");
   const navigate = useNavigate();
   const [excalidrawAPI, setExcalidrawAPI] = useState(null);
+  const lastSaveTimeRef = useRef(0);
+  const autoSaveTimeoutRef = useRef(null);
+  const lastElementCountRef = useRef(0);
 
   const initialData = {
     elements: [
@@ -533,6 +539,117 @@ function MindMapping() {
     } catch (_) {}
   }, []);
 
+  // Save Excalidraw scene when entering Mind Mapping (component mounts with API ready)
+  useEffect(() => {
+    if (!excalidrawAPI || !organizationName) return;
+    
+    const timer = setTimeout(async () => {
+      try {
+        const elements = excalidrawAPI.getSceneElements();
+        if (elements && elements.length > 0) {
+          const result = await saveExcalidrawToOrganization(excalidrawAPI, organizationName, 'mindmapping');
+          if (result.success) {
+            lastSaveTimeRef.current = Date.now();
+            lastElementCountRef.current = elements.length;
+            console.log('Excalidraw scene saved to organization folder on mind mapping entry');
+          }
+        }
+      } catch (error) {
+        console.error('Failed to save Excalidraw scene on entry:', error);
+      }
+    }, 2000); // Wait 2 seconds for Excalidraw to be fully rendered
+    
+    return () => clearTimeout(timer);
+  }, [excalidrawAPI, organizationName]);
+
+  // Auto-save Excalidraw scene when it changes
+  useEffect(() => {
+    if (!excalidrawAPI || !organizationName) return;
+
+    const handleChange = () => {
+      try {
+        const elements = excalidrawAPI.getSceneElements();
+        const currentElementCount = elements ? elements.length : 0;
+        const currentTime = Date.now();
+        
+        // Only auto-save if there are elements and something changed
+        if (currentElementCount > 0 && 
+            (currentElementCount !== lastElementCountRef.current || 
+             currentTime - lastSaveTimeRef.current > 10000)) { // Also save if 10 seconds passed
+          
+          // Clear any pending auto-save
+          if (autoSaveTimeoutRef.current) {
+            clearTimeout(autoSaveTimeoutRef.current);
+          }
+          
+          // Debounce auto-save (save 5 seconds after last change)
+          autoSaveTimeoutRef.current = setTimeout(async () => {
+            try {
+              const result = await saveExcalidrawToOrganization(excalidrawAPI, organizationName, 'mindmapping');
+              if (result.success) {
+                lastSaveTimeRef.current = Date.now();
+                lastElementCountRef.current = currentElementCount;
+                console.log('Excalidraw scene auto-saved to organization folder');
+              }
+            } catch (error) {
+              console.error('Auto-save failed:', error);
+            }
+          }, 5000); // 5 second debounce
+        }
+      } catch (error) {
+        console.error('Error in auto-save handler:', error);
+      }
+    };
+
+    // Use a combination of polling and scene element tracking
+    // Check every 3 seconds for changes
+    const interval = setInterval(() => {
+      handleChange();
+    }, 3000);
+
+    return () => {
+      clearInterval(interval);
+      if (autoSaveTimeoutRef.current) {
+        clearTimeout(autoSaveTimeoutRef.current);
+      }
+    };
+  }, [excalidrawAPI, organizationName]);
+
+  // Manual save handler
+  const handleSave = async () => {
+    if (!excalidrawAPI) {
+      toast.error('Excalidraw is not ready');
+      return;
+    }
+
+    try {
+      // Save to localStorage
+      const mindmapTemplate = {
+        elements: excalidrawAPI.getSceneElements(),
+        appState: excalidrawAPI.getAppState(),
+        timestamp: Date.now()
+      };
+      localStorage.setItem('mindmap-template', JSON.stringify(mindmapTemplate));
+
+      // Also save to organization folder if organization name is available
+      if (organizationName) {
+        const result = await saveExcalidrawToOrganization(excalidrawAPI, organizationName, 'mindmapping');
+        if (result.success) {
+          lastSaveTimeRef.current = Date.now();
+          lastElementCountRef.current = excalidrawAPI.getSceneElements().length;
+          toast.success('Mind map saved to organization folder!');
+        } else {
+          toast.error(result.error || 'Failed to save to organization folder');
+        }
+      } else {
+        toast.success('Mind map saved to local storage');
+      }
+    } catch (error) {
+      console.error('Error saving mind map:', error);
+      toast.error('Failed to save mind map');
+    }
+  };
+
   // Observe localStorage changes across tabs to detect deletions
   useEffect(() => {
     const keysToWatch = new Set(['excali-save', 'handoff:excalidrawSceneToEditor', 'excali-save:ts']);
@@ -550,11 +667,35 @@ function MindMapping() {
   return (
     <div className="h-screen flex flex-col overflow-hidden bg-slate-50 dark:bg-slate-900">
       {/* Top bar to match editor navbar styling */}
+      {organizationName && (
+        <OrganizationImageBar 
+          organizationName={organizationName} 
+          mode="mindmapping"
+          excalidrawAPI={excalidrawAPI}
+        />
+      )}
       <nav className="h-16 border-b border-slate-200 dark:border-slate-700 bg-white/80 dark:bg-slate-900/80 backdrop-blur-lg flex items-center justify-between px-6 shadow-sm">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 bg-clip-text text-transparent"> 3YUGA Mind Mapping</h1>
         </div>
         <div className="flex items-center gap-2">
+          <button
+            onClick={handleSave}
+            className="px-3 py-1.5 text-sm rounded-md border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 flex items-center gap-2"
+            title={organizationName ? "Save to organization folder" : "Save to local storage"}
+          >
+            {organizationName ? (
+              <>
+                <CloudUpload className="w-4 h-4" />
+                Save to Cloud
+              </>
+            ) : (
+              <>
+                <Save className="w-4 h-4" />
+                Save
+              </>
+            )}
+          </button>
           <button
             onClick={() => {
               try {
@@ -597,9 +738,47 @@ function MindMapping() {
         <div className="h-full rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 shadow-sm">
           <div style={{ height: "100%", minHeight: "500px" }}>
             <Excalidraw
-              excalidrawAPI={(api) => setExcalidrawAPI(api)}
+              excalidrawAPI={(api) => {
+                setExcalidrawAPI(api);
+                // Track initial element count when API is ready
+                if (api) {
+                  const elements = api.getSceneElements();
+                  lastElementCountRef.current = elements ? elements.length : 0;
+                }
+              }}
               initialData={initialData}
               theme={theme}
+              onChange={(elements, appState, files) => {
+                // Update element count when scene changes
+                if (elements) {
+                  const currentCount = elements.length;
+                  if (currentCount !== lastElementCountRef.current) {
+                    lastElementCountRef.current = currentCount;
+                    // Trigger auto-save check
+                    if (excalidrawAPI && organizationName) {
+                      const currentTime = Date.now();
+                      if (currentTime - lastSaveTimeRef.current > 5000) {
+                        // Clear any pending auto-save
+                        if (autoSaveTimeoutRef.current) {
+                          clearTimeout(autoSaveTimeoutRef.current);
+                        }
+                        // Debounce auto-save
+                        autoSaveTimeoutRef.current = setTimeout(async () => {
+                          try {
+                            const result = await saveExcalidrawToOrganization(excalidrawAPI, organizationName, 'mindmapping');
+                            if (result.success) {
+                              lastSaveTimeRef.current = Date.now();
+                              console.log('Excalidraw scene auto-saved to organization folder');
+                            }
+                          } catch (error) {
+                            console.error('Auto-save failed:', error);
+                          }
+                        }, 5000);
+                      }
+                    }
+                  }
+                }
+              }}
               UIOptions={{
                 canvasActions: {
                   changeViewBackgroundColor: true,

@@ -1,0 +1,3 @@
+{
+  "/api/organization/[orgName]/create": "pages/api/organization/[orgName]/create.js"
+}

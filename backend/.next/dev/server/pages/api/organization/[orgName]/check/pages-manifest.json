@@ -1,0 +1,3 @@
+{
+  "/api/organization/[orgName]/check": "pages/api/organization/[orgName]/check.js"
+}

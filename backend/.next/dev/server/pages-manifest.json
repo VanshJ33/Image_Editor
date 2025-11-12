@@ -1,0 +1,6 @@
+{
+  "/api/organization/[orgName]/check": "pages/api/organization/[orgName]/check.js",
+  "/api/organization/[orgName]/image/[imageId]": "pages/api/organization/[orgName]/image/[imageId].js",
+  "/api/organization/[orgName]/images": "pages/api/organization/[orgName]/images.js",
+  "/api/organization/[orgName]/upload": "pages/api/organization/[orgName]/upload.js"
+}

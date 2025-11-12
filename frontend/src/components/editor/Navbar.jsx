@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from '../ui/button';
 import { useEditor } from '../../contexts/EditorContext.tsx';
-import { Undo, Redo, Download, Save, Plus, ZoomIn, ZoomOut, Moon, Sun, Grid3x3, ArrowUp, ArrowDown, Copy, Trash2, Keyboard, RotateCcw, Maximize2, Layers, RotateCw, Minimize2 } from 'lucide-react';
+import { Undo, Redo, Download, Save, Plus, ZoomIn, ZoomOut, Moon, Sun, Grid3x3, ArrowUp, ArrowDown, Copy, Trash2, Keyboard, RotateCcw, Maximize2, Layers, RotateCw, Minimize2, CloudUpload } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
 import { Toaster } from '../ui/sonner';
@@ -11,8 +11,9 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from '../ui/popover';
+import { saveCanvasToOrganization } from '../../utils/canvasSave';
 
-const Navbar = () => {
+const Navbar = ({ organizationName }: { organizationName?: string }) => {
   const { canvas, undo, redo, zoom, setZoom, isDarkMode, setIsDarkMode, saveToHistory, showGrid, setShowGrid, activeObject, bringForward, sendBackward, copyObject, deleteObject, exportCanvas, duplicateObject, centerObject, resetCanvas, isLoading, rotateCanvas, history, historyStep, gifHandler } = useEditor();
   const location = useLocation();
   const navigate = useNavigate();
@@ -40,11 +41,28 @@ const Navbar = () => {
     }
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (canvas) {
+      // Save to localStorage
       const json = JSON.stringify(canvas.toJSON());
       localStorage.setItem('canva-design', json);
-      // Design saved to local storage
+      
+      // Also save to organization folder if organization name is available
+      if (organizationName) {
+        try {
+          const result = await saveCanvasToOrganization(canvas, organizationName, 'editor');
+          if (result.success) {
+            toast.success('Canvas saved to organization folder!');
+          } else {
+            toast.error(result.error || 'Failed to save to organization folder');
+          }
+        } catch (error) {
+          console.error('Error saving to organization:', error);
+          toast.error('Failed to save to organization folder');
+        }
+      } else {
+        toast.success('Design saved to local storage');
+      }
     }
   };
 
@@ -142,9 +160,20 @@ const Navbar = () => {
           <Button onClick={() => rotateCanvas('right')} variant="outline" size="sm" className="hover:bg-slate-100 dark:hover:bg-slate-800 transition-all" title="Rotate Right">
             <RotateCw className="w-4 h-4" />
           </Button>
-          <Button onClick={handleSave} variant="outline" size="sm" className="gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all">
-            <Save className="w-4 h-4" />
-            Save
+          <Button 
+            onClick={handleSave} 
+            variant="outline" 
+            size="sm" 
+            className="gap-2 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all"
+            disabled={isLoading}
+            title={organizationName ? "Save to organization folder" : "Save to local storage"}
+          >
+            {organizationName ? (
+              <CloudUpload className="w-4 h-4" />
+            ) : (
+              <Save className="w-4 h-4" />
+            )}
+            {organizationName ? 'Save to Cloud' : 'Save'}
           </Button>
           <Button 
             onClick={handleExport} 

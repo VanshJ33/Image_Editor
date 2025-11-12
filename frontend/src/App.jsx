@@ -1,10 +1,11 @@
-import React from "react";
+import React, { useState, useEffect } from "react";
 import "./App.css";
 import { BrowserRouter, Routes, Route, useLocation } from "react-router-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import Editor from "./components/editor/Editor";
 import ModeSelector from "./components/ui/ModeSelector";
 import MindMapping from "./components/mindmapping/MindMapping";
+import OrganizationInput from "./components/ui/OrganizationInput";
 
 const PageWrapper = ({ children }) => (
   <motion.div initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -8 }} transition={{ duration: 0.25, ease: "easeOut" }} style={{ height: "100%" }}>
@@ -12,7 +13,7 @@ const PageWrapper = ({ children }) => (
   </motion.div>
 );
 
-function AnimatedRoutes() {
+function AnimatedRoutes({ organizationName }) {
   const location = useLocation();
   return (
     <AnimatePresence mode="wait">
@@ -21,7 +22,7 @@ function AnimatedRoutes() {
           path="/"
           element={
             <PageWrapper>
-              <ModeSelector />
+              <ModeSelector organizationName={organizationName} />
             </PageWrapper>
           }
         />
@@ -29,7 +30,7 @@ function AnimatedRoutes() {
           path="/editor"
           element={
             <PageWrapper>
-              <Editor />
+              <Editor organizationName={organizationName} />
             </PageWrapper>
           }
         />
@@ -37,7 +38,7 @@ function AnimatedRoutes() {
           path="/mindmapping"
           element={
            <React.StrictMode>
-  <MindMapping />
+  <MindMapping organizationName={organizationName} />
 </React.StrictMode>
 
           }
@@ -48,10 +49,30 @@ function AnimatedRoutes() {
 }
 
 function App() {
+  const [organizationName, setOrganizationName] = useState(null);
+
+  useEffect(() => {
+    // Check if organization name is stored in localStorage
+    const storedOrg = localStorage.getItem('organizationName');
+    if (storedOrg) {
+      setOrganizationName(storedOrg);
+    }
+  }, []);
+
+  const handleOrganizationVerified = (orgName) => {
+    setOrganizationName(orgName);
+    localStorage.setItem('organizationName', orgName);
+  };
+
+  // Show organization input if not verified
+  if (!organizationName) {
+    return <OrganizationInput onOrganizationVerified={handleOrganizationVerified} />;
+  }
+
   return (
     <div className="App" style={{ width: "100vw", height: "100vh" }}>
       <BrowserRouter>
-        <AnimatedRoutes />
+        <AnimatedRoutes organizationName={organizationName} />
       </BrowserRouter>
     </div>
   );
