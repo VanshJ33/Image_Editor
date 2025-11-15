@@ -1,5 +1,5 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
-import { Canvas as FabricCanvas, Line, FabricImage, Rect } from 'fabric';
+import { Canvas as FabricCanvas, Line, FabricImage, Rect, Point, util } from 'fabric';
 import { useEditor } from '../../contexts/EditorContext';
 import { motion } from 'framer-motion';
 import ContextMenu from './ContextMenu';
@@ -8,6 +8,10 @@ import { toast } from 'sonner';
 import * as fabric from 'fabric';
 import { ActiveSelection } from 'fabric';
 import AnimatedGifHandler from '../../utils/animated-gif-handler';
+import { initPixi, getPixiApp, resizePixi, destroyPixi, isPixiAvailable } from '../../utils/pixiLayer';
+import { setupFabricPixiSync } from '../../utils/fabricPixiSync';
+import { syncToPixi, syncResize } from '../../utils/viewportSync';
+
 
 // Minimal importer: Excalidraw -> Fabric objects (ellipse, text, arrow)
 function importExcalidrawToFabric(canvas, scene) {
@@ -213,6 +217,9 @@ function importExcalidrawToFabric(canvas, scene) {
 const Canvas = () => {
   const { canvas, setCanvas, canvasRef, setActiveObject, saveToHistory, updateLayers, canvasSize, zoom, setZoom, backgroundColor, showGrid, canvasRotation, activeObject, undo, redo, isDrawingCustom, setIsDrawingCustom, customPath, setCustomPath, fillShapeWithImage, createBoard, switchBoard, boards, setGifHandler } = useEditor();
   const containerRef = useRef(null);
+  const pixiContainerRef = useRef(null);
+  const pixiInitializedRef = useRef(false);
+
   const gifHandlerRef = useRef(null);
   const [contextMenu, setContextMenu] = useState({ visible: false, x: 0, y: 0 });
   const [cropDialog, setCropDialog] = useState({ open: false, imageObject: null });
@@ -241,7 +248,60 @@ const Canvas = () => {
         transparentCorners: false,
         touchCornerSize: 16,
         centeredScaling: false,
-        centeredRotation: false
+        centeredRotation: false,
+        controlsAboveOverlay: false
+      });
+      
+      // Disable default dimension overlay
+      fabricCanvas.controlsAboveOverlay = false;
+
+      // Custom overlay for object dimensions
+      const renderObjectDimensions = (ctx) => {
+        const activeObject = fabricCanvas.getActiveObject();
+        if (!activeObject || activeObject.type === 'activeSelection') return;
+        
+        const bounds = activeObject.getBoundingRect();
+        const zoom = fabricCanvas.getZoom();
+        const vpt = fabricCanvas.viewportTransform;
+        
+        // Calculate position on canvas
+        const x = bounds.left + bounds.width / 2;
+        const y = bounds.top - 20;
+        
+        // Transform to viewport coordinates
+        const point = new Point(x, y).transform(util.multiplyTransformMatrices(vpt, [zoom, 0, 0, zoom, 0, 0]));
+        
+        // Round dimensions
+        const width = Math.round(bounds.width);
+        const height = Math.round(bounds.height);
+        
+        // Draw background
+        const text = `${width} × ${height}`;
+        ctx.save();
+        ctx.font = '12px Inter, sans-serif';
+        const textWidth = ctx.measureText(text).width;
+        const padding = 8;
+        const bgWidth = textWidth + padding * 2;
+        const bgHeight = 24;
+        
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)';
+        ctx.fillRect(point.x - bgWidth / 2, point.y - bgHeight / 2, bgWidth, bgHeight);
+        
+        // Draw text
+        ctx.fillStyle = '#ffffff';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, point.x, point.y);
+        ctx.restore();
+      };
+      
+      // Override after:render to show dimensions
+      fabricCanvas.on('after:render', () => {
+        const activeObject = fabricCanvas.getActiveObject();
+        if (activeObject && activeObject.type !== 'activeSelection') {
+          const ctx = fabricCanvas.getContext();
+          renderObjectDimensions(ctx);
+        }
       });
 
       fabricCanvas.on('selection:created', (e) => {
@@ -358,8 +418,21 @@ const Canvas = () => {
             lockScalingFlip: true,
             lockUniScaling: false,
             hasControls: true,
-            hasBorders: true
+            hasBorders: true,
+            controlsAboveOverlay: false
           });
+          
+          // Override _renderControls to prevent default dimension display
+          if (!obj._dimensionOverlayDisabled) {
+            const originalRenderControls = obj._renderControls;
+            obj._renderControls = function(ctx) {
+              if (originalRenderControls) {
+                originalRenderControls.call(this, ctx);
+              }
+              // Don't render default dimension overlay
+            };
+            obj._dimensionOverlayDisabled = true;
+          }
         }
         
         fabricCanvas.renderAll();
@@ -598,10 +671,52 @@ const Canvas = () => {
           gifHandlerRef.current = null;
         }
         
+        // Clean up PixiJS
+        if (pixiInitializedRef.current) {
+          try {
+            destroyPixi();
+            pixiInitializedRef.current = false;
+          } catch (error) {
+            console.warn('Error destroying PixiJS:', error);
+          }
+        }
+        
         fabricCanvas.dispose();
       };
     }
   }, []);
+
+  // Initialize PixiJS after container is mounted
+  useEffect(() => {
+    if (canvas && pixiContainerRef.current && !pixiInitializedRef.current) {
+      try {
+        const pixiApp = initPixi(pixiContainerRef.current, {
+          width: canvasSize.width,
+          height: canvasSize.height,
+          backgroundColor: backgroundColor === 'transparent' ? 0xffffff : (typeof backgroundColor === 'string' && backgroundColor.startsWith('#') 
+            ? parseInt(backgroundColor.slice(1), 16) 
+            : 0xffffff)
+        });
+        
+        if (pixiApp) {
+          pixiInitializedRef.current = true;
+          console.log('PixiJS initialized successfully for GPU acceleration');
+          
+          // Setup Fabric-Pixi synchronization
+          setupFabricPixiSync(canvas);
+          
+          // Sync initial viewport
+          syncToPixi(canvas);
+          syncResize(canvas);
+        } else {
+          console.warn('PixiJS initialization failed, continuing with Fabric-only rendering');
+        }
+      } catch (error) {
+        console.warn('PixiJS initialization error:', error);
+        // Continue with Fabric-only rendering
+      }
+    }
+  }, [canvas, canvasSize, backgroundColor]);
 
   const autoFitCanvas = useCallback(() => {
     if (canvas && containerRef.current) {
@@ -630,6 +745,12 @@ const Canvas = () => {
       canvas.setWidth(canvasSize.width * scale);
       canvas.setHeight(canvasSize.height * scale);
       canvas.renderAll();
+      
+      // Sync viewport to Pixi
+      if (isPixiAvailable()) {
+        syncToPixi(canvas);
+        syncResize(canvas);
+      }
     }
   }, [zoom, canvas, canvasSize]);
 
@@ -642,6 +763,12 @@ const Canvas = () => {
       if (currentWidth !== canvasSize.width || currentHeight !== canvasSize.height) {
         canvas.setDimensions(canvasSize);
         canvas.renderAll();
+        
+        // Sync resize to Pixi
+        if (isPixiAvailable()) {
+          resizePixi(canvasSize.width, canvasSize.height);
+          syncResize(canvas);
+        }
       }
     }
   }, [canvasSize, canvas]);
@@ -660,6 +787,17 @@ const Canvas = () => {
     if (canvas) {
       canvas.backgroundColor = backgroundColor;
       canvas.renderAll();
+      
+      // Update Pixi background color if available
+      if (isPixiAvailable()) {
+        const pixiApp = getPixiApp();
+        if (pixiApp) {
+          const bgColor = backgroundColor === 'transparent' ? 0xffffff : (typeof backgroundColor === 'string' && backgroundColor.startsWith('#') 
+            ? parseInt(backgroundColor.slice(1), 16) 
+            : 0xffffff);
+          pixiApp.renderer.backgroundColor = bgColor;
+        }
+      }
     }
   }, [backgroundColor, canvas]);
 
@@ -1111,15 +1249,29 @@ const Canvas = () => {
         className="relative group"
       >
         <div className="relative rounded-2xl overflow-hidden shadow-2xl ring-1 ring-slate-200/50 dark:ring-slate-700/50 bg-white dark:bg-slate-800">
+          {/* PixiJS canvas container (background layer for GPU rendering) */}
+          <div 
+            ref={pixiContainerRef}
+            className="absolute inset-0"
+            style={{
+              zIndex: 0,
+              pointerEvents: 'none',
+              transform: `rotate(${canvasRotation}deg)`,
+              transition: 'transform 0.3s ease'
+            }}
+          />
+          {/* FabricJS canvas (foreground layer for interactions) */}
           <canvas 
             ref={canvasRef} 
-            className="block" 
+            className="block relative" 
             style={{
               maxWidth: '100%',
               maxHeight: '70vh',
               objectFit: 'contain',
               transform: `rotate(${canvasRotation}deg)`,
-              transition: 'transform 0.3s ease'
+              transition: 'transform 0.3s ease',
+              zIndex: 1,
+              position: 'relative'
             }}
           />
           

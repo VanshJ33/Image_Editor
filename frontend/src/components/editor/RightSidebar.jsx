@@ -7,7 +7,7 @@ import { Input } from '../ui/input';
 import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, Wand2, GripVertical, Group, Ungroup, CheckSquare, Square, ChevronDown, ChevronRight, Image as ImageIcon, Paintbrush, Sparkles, X } from 'lucide-react';
+import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, GripVertical, Group, Ungroup, CheckSquare, Square, ChevronDown, ChevronRight, Image as ImageIcon, Paintbrush, Sparkles, X } from 'lucide-react';
 import { motion, Reorder } from 'framer-motion';
 import { toast } from 'sonner';
 import * as fabric from 'fabric';
@@ -167,11 +167,7 @@ const RightSidebar = () => {
     fontSize: 32,
     fontFamily: 'Inter',
     fontWeight: 'normal',
-    textAlign: 'left',
-    brightness: 0,
-    contrast: 0,
-    saturation: 0,
-    blur: 0
+    textAlign: 'left'
   });
 
   useEffect(() => {
@@ -184,11 +180,7 @@ const RightSidebar = () => {
         fontSize: activeObject.fontSize || 32,
         fontFamily: activeObject.fontFamily || 'Inter',
         fontWeight: activeObject.fontWeight || 'normal',
-        textAlign: activeObject.textAlign || 'left',
-        brightness: activeObject.brightness || 0,
-        contrast: activeObject.contrast || 0,
-        saturation: activeObject.saturation || 0,
-        blur: activeObject.blur || 0
+        textAlign: activeObject.textAlign || 'left'
       };
       setProperties(newProperties);
       
@@ -238,9 +230,6 @@ const RightSidebar = () => {
         canvas.requestRenderAll();
       } else if (key === 'opacity') {
         activeObject.set(key, value / 100);
-      } else if (['brightness', 'contrast', 'saturation', 'blur'].includes(key)) {
-        activeObject.set(key, value);
-        applyFilters();
       } else {
         activeObject.set(key, value);
       }
@@ -256,31 +245,6 @@ const RightSidebar = () => {
     }
   };
 
-  const applyFilters = () => {
-    if (activeObject && activeObject.type === 'image') {
-      const filterArray = [];
-      
-      if (properties.brightness !== 0) {
-        filterArray.push(new fabric.filters.Brightness({ brightness: properties.brightness / 100 }));
-      }
-      
-      if (properties.contrast !== 0) {
-        filterArray.push(new fabric.filters.Contrast({ contrast: properties.contrast / 100 }));
-      }
-      
-      if (properties.saturation !== 0) {
-        filterArray.push(new fabric.filters.Saturation({ saturation: properties.saturation / 100 }));
-      }
-      
-      if (properties.blur > 0) {
-        filterArray.push(new fabric.filters.Blur({ blur: properties.blur / 100 }));
-      }
-      
-      activeObject.filters = filterArray;
-      activeObject.applyFilters();
-      canvas.renderAll();
-    }
-  };
 
   const deleteObject = () => {
     if (activeObject && canvas) {
@@ -869,91 +833,6 @@ const setAsBackground = () => {
 )}
 
 
-                        </div>
-                      </div>
-                      
-                      <div className="flex items-center gap-2 mb-3">
-                        <Wand2 className="w-4 h-4" />
-                        <Label className="font-semibold">Image Filters</Label>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Brightness</Label>
-                        <div className="flex gap-2">
-                          <Slider
-                            value={[properties.brightness]}
-                            onValueChange={(val) => updateProperty('brightness', val[0])}
-                            min={-100}
-                            max={100}
-                            step={1}
-                            className="flex-1"
-                          />
-                          <Input
-                            type="number"
-                            value={properties.brightness}
-                            onChange={(e) => updateProperty('brightness', parseInt(e.target.value))}
-                            className="w-16"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Contrast</Label>
-                        <div className="flex gap-2">
-                          <Slider
-                            value={[properties.contrast]}
-                            onValueChange={(val) => updateProperty('contrast', val[0])}
-                            min={-100}
-                            max={100}
-                            step={1}
-                            className="flex-1"
-                          />
-                          <Input
-                            type="number"
-                            value={properties.contrast}
-                            onChange={(e) => updateProperty('contrast', parseInt(e.target.value))}
-                            className="w-16"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Saturation</Label>
-                        <div className="flex gap-2">
-                          <Slider
-                            value={[properties.saturation]}
-                            onValueChange={(val) => updateProperty('saturation', val[0])}
-                            min={-100}
-                            max={100}
-                            step={1}
-                            className="flex-1"
-                          />
-                          <Input
-                            type="number"
-                            value={properties.saturation}
-                            onChange={(e) => updateProperty('saturation', parseInt(e.target.value))}
-                            className="w-16"
-                          />
-                        </div>
-                      </div>
-
-                      <div className="space-y-2">
-                        <Label>Blur</Label>
-                        <div className="flex gap-2">
-                          <Slider
-                            value={[properties.blur]}
-                            onValueChange={(val) => updateProperty('blur', val[0])}
-                            min={0}
-                            max={100}
-                            step={1}
-                            className="flex-1"
-                          />
-                          <Input
-                            type="number"
-                            value={properties.blur}
-                            onChange={(e) => updateProperty('blur', parseInt(e.target.value))}
-                            className="w-16"
-                          />
                         </div>
                       </div>
 

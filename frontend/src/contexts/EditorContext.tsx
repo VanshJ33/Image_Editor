@@ -1519,6 +1519,16 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       
       (activeObject as any).applyFilters();
       canvas.renderAll();
+      
+      // Sync filters to Pixi for GPU acceleration
+      try {
+        const { syncFiltersToPixi } = require('../utils/fabricPixiSync');
+        syncFiltersToPixi(activeObject as any, null); // pixiApp is accessed internally
+      } catch (error) {
+        console.warn('Failed to sync filters to Pixi:', error);
+        // Fallback: continue with Fabric-only rendering
+      }
+      
       setActiveFilterPreset(preset);
       saveToHistory();
       toast.success(`Applied ${preset.name} filter`);

@@ -4,7 +4,7 @@ import { ScrollArea } from '../ui/scroll-area';
 import { Button } from '../ui/button';
 import { Label } from '../ui/label';
 import { Input } from '../ui/input';
-import { LayoutTemplate, Upload, Type, Shapes, Image as ImageIcon, Sparkles, Palette, Search, Wand2, Zap, Crown, Layers3, Paintbrush } from 'lucide-react';
+import { LayoutTemplate, Upload, Type, Shapes, Image as ImageIcon, Sparkles, Palette, Search, Wand2, Zap, Crown, Layers3, Paintbrush, Images } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useEditor } from '../../contexts/EditorContext';
 import { Textbox, Rect, Circle, Triangle, Line, FabricImage, FabricText, Polygon, Ellipse, Path, Gradient, Group, FabricObject } from 'fabric';
@@ -16,6 +16,7 @@ import { loadGoogleFont } from '../../utils/googleFonts';
 import { templates } from '../../data/templates';
 import { canvaTemplates } from '../../data/canvaTemplates';
 import ElementsPanel from './ElementsPanel';
+import StockImageSearch from './StockImageSearch';
 import { colorToHex } from '../../lib/utils';
 
 
@@ -27,6 +28,7 @@ const LeftSidebar = () => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [templateSearch, setTemplateSearch] = useState('');
+  const [stockImageSearchOpen, setStockImageSearchOpen] = useState(false);
 
 
   const loadCanvaTemplate = async (template) => {
@@ -35,9 +37,13 @@ const LeftSidebar = () => {
     canvas.clear();
     backgroundObjRef.current = null;
     
-    setCanvasSize({ width: 1080, height: 1080 });
-    canvas.setWidth(1080);
-    canvas.setHeight(1080);
+    // Use template dimensions if available, otherwise default to 1080x1080
+    const templateWidth = template.json.width || 1080;
+    const templateHeight = template.json.height || 1080;
+    
+    setCanvasSize({ width: templateWidth, height: templateHeight });
+    canvas.setWidth(templateWidth);
+    canvas.setHeight(templateHeight);
     
     const fontsToLoad = new Set();
     template.json.objects.forEach(objData => {
@@ -57,15 +63,111 @@ const LeftSidebar = () => {
     }
     
     canvas.loadFromJSON(template.json, async () => {
-      // After loading, mark template elements and ensure GIF objects have IDs
-      canvas.getObjects().forEach(obj => {
+      // Process all objects to ensure they're properly loaded and editable
+      const objects = canvas.getObjects();
+      const imagePromises = [];
+      
+      objects.forEach((obj, index) => {
         // Ensure GIF objects have IDs (needed for animated elements)
         if (obj.isAnimatedGif && !obj.id) {
           obj.id = 'gif_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
         }
         
+        // Handle image objects - ensure they load properly
+        if (obj.type === 'image' && obj.src) {
+          // If image hasn't loaded, reload it
+          if (!obj.getElement || !obj.getElement()) {
+            const imgPromise = FabricImage.fromURL(obj.src, { 
+              crossOrigin: 'anonymous' 
+            }).then((img) => {
+              // Update the existing object with loaded image
+              obj.setElement(img.getElement());
+              obj.set({
+                left: obj.left || 0,
+                top: obj.top || 0,
+                width: obj.width || img.width || 100,
+                height: obj.height || img.height || 100,
+                scaleX: obj.scaleX || 1,
+                scaleY: obj.scaleY || 1,
+                selectable: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+                evented: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+                hasControls: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+                hasBorders: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+                lockMovementX: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+                lockMovementY: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+                lockRotation: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+                lockScalingX: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+                lockScalingY: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+                opacity: obj.opacity !== undefined ? obj.opacity : 1
+              });
+              obj.setCoords();
+              return obj;
+            }).catch((error) => {
+              console.error('Error loading image:', obj.src, error);
+              return null;
+            });
+            imagePromises.push(imgPromise);
+          } else {
+            // Image already loaded, just ensure properties are set
+            obj.set({
+              selectable: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+              evented: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+              hasControls: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+              hasBorders: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+              lockMovementX: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+              lockMovementY: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+              lockRotation: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+              lockScalingX: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+              lockScalingY: obj.name === 'Background Base' || obj.name === 'Background with Pattern'
+            });
+          }
+        }
+        
+        // Handle textbox objects - ensure they're editable
+        if (obj.type === 'textbox' || obj.type === 'text') {
+          obj.set({
+            selectable: true,
+            evented: true,
+            hasControls: true,
+            hasBorders: true,
+            editable: true,
+            lockMovementX: false,
+            lockMovementY: false,
+            lockRotation: false,
+            lockScalingX: false,
+            lockScalingY: false,
+            cornerSize: 12,
+            cornerStyle: 'circle',
+            transparentCorners: false,
+            cornerColor: '#4f46e5',
+            borderColor: '#4f46e5',
+            borderScaleFactor: 2
+          });
+        }
+        
+        // Handle other objects (rect, circle, etc.)
+        if (obj.type !== 'image' && obj.type !== 'textbox' && obj.type !== 'text') {
+          obj.set({
+            selectable: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+            evented: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+            hasControls: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+            hasBorders: obj.name !== 'Background Base' && obj.name !== 'Background with Pattern',
+            lockMovementX: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+            lockMovementY: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+            lockRotation: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+            lockScalingX: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+            lockScalingY: obj.name === 'Background Base' || obj.name === 'Background with Pattern',
+            cornerSize: 12,
+            cornerStyle: 'circle',
+            transparentCorners: false,
+            cornerColor: '#4f46e5',
+            borderColor: '#4f46e5',
+            borderScaleFactor: 2
+          });
+        }
+        
+        // Set visual indicators for template elements
         if (obj.isTemplateImage || obj.isTemplateText) {
-          // Add visual indicators for template elements
           obj.set({
             borderColor: obj.isTemplateImage ? '#4f46e5' : '#10b981',
             borderScaleFactor: 2,
@@ -75,7 +177,12 @@ const LeftSidebar = () => {
             cornerStyle: 'circle'
           });
         }
+        
+        obj.setCoords();
       });
+      
+      // Wait for all images to load
+      await Promise.all(imagePromises);
       
       // Process GIFs after template is loaded (create animated elements)
       if (gifHandler && typeof gifHandler.processGifsAfterTemplateLoad === 'function') {
@@ -87,18 +194,27 @@ const LeftSidebar = () => {
         gifHandler.setLoadingTemplate(false);
       }
       
+      // Ensure canvas is properly rendered
       canvas.renderAll();
       canvas.requestRenderAll();
-      // Force canvas to fit viewport
       canvas.calcOffset();
+      
       // Use setTimeout to ensure layers update after canvas is fully rendered
       setTimeout(() => {
         updateLayers();
         saveToHistory();
         canvas.renderAll();
+        canvas.requestRenderAll();
         // Template loaded
-      }, 150);
+      }, 200);
 
+    }, (o, object) => {
+      // Reviver function to handle image loading during JSON parsing
+      if (object.type === 'image' && object.src) {
+        // Return a promise that will be handled in the callback
+        return object;
+      }
+      return object;
     });
   };
 
@@ -1488,7 +1604,7 @@ const backgroundColors = [
                   <div>
                     <h4 className="text-xs font-medium text-slate-600 dark:text-slate-400 mb-2">Categories</h4>
                     <div className="flex flex-wrap gap-1">
-                      {['all', 'Social Media', 'Business', 'Instagram Ads', 'WhatsApp Ads', 'Facebook Ads', 'Ecommerce'].map((category) => (
+                      {['all', 'Social Media', 'Business', 'Instagram Ads', 'WhatsApp Ads', 'Facebook Ads', 'Ecommerce', 'Wedding'].map((category) => (
                         <button
                           key={category}
                           onClick={() => setSelectedCategory(category)}
@@ -1565,7 +1681,7 @@ const backgroundColors = [
                       return matchesCategory && matchesSearch;
                     })
                     .sort((a, b) => {
-                      const categoryOrder = ['Business', 'Social Media', 'Instagram Ads', 'WhatsApp Ads', 'Facebook Ads', 'Ecommerce'];
+                      const categoryOrder = ['Business', 'Social Media', 'Instagram Ads', 'WhatsApp Ads', 'Facebook Ads', 'Ecommerce', 'Wedding'];
                       const getMainCategory = (cat) => cat.startsWith('Social Media') ? 'Social Media' : cat;
                       const aIndex = categoryOrder.indexOf(getMainCategory(a.category));
                       const bIndex = categoryOrder.indexOf(getMainCategory(b.category));
@@ -1699,6 +1815,34 @@ const backgroundColors = [
             <TabsContent value="upload" className="mt-0 pb-6 h-full overflow-y-auto">
               <h3 className="font-semibold text-sm text-slate-700 dark:text-slate-300 mb-3">Upload Media</h3>
               <div className="space-y-3">
+                {/* Stock Image Search Button */}
+                <motion.div
+                  whileHover={{ scale: 1.02 }}
+                  whileTap={{ scale: 0.98 }}
+                >
+                  <Button
+                    onClick={() => setStockImageSearchOpen(true)}
+                    className="w-full h-auto py-6 bg-gradient-to-r from-indigo-500 to-purple-600 hover:from-indigo-600 hover:to-purple-700 text-white border-0"
+                  >
+                    <div className="flex flex-col items-center gap-2">
+                      <Images className="w-6 h-6" />
+                      <div className="text-left">
+                        <p className="font-semibold text-base">Search Stock Images</p>
+                        <p className="text-xs opacity-90">Find free images from Pixabay</p>
+                      </div>
+                    </div>
+                  </Button>
+                </motion.div>
+
+                <div className="relative">
+                  <div className="absolute inset-0 flex items-center">
+                    <span className="w-full border-t border-slate-300 dark:border-slate-600" />
+                  </div>
+                  <div className="relative flex justify-center text-xs uppercase">
+                    <span className="bg-white dark:bg-slate-900 px-2 text-slate-500">Or</span>
+                  </div>
+                </div>
+
                 <label htmlFor="image-upload" className="block">
                   <motion.div
                     whileHover={{ scale: 1.02 }}
@@ -2287,6 +2431,12 @@ const backgroundColors = [
 
         </div>
       </Tabs>
+      
+      {/* Stock Image Search Dialog */}
+      <StockImageSearch 
+        open={stockImageSearchOpen} 
+        onOpenChange={setStockImageSearchOpen} 
+      />
     </motion.div>
   );
 };
