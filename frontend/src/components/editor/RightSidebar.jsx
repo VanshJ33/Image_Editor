@@ -8,6 +8,7 @@ import { Slider } from '../ui/slider';
 import { Button } from '../ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Settings, Layers, AlignLeft, AlignCenter, AlignRight, Trash2, Copy, Lock, Unlock, Eye, EyeOff, GripVertical, Group, Ungroup, CheckSquare, Square, ChevronDown, ChevronRight, Image as ImageIcon, Paintbrush, Sparkles, X } from 'lucide-react';
+import LayerDetailsPanel from './LayerDetailsPanel';
 import { motion, Reorder } from 'framer-motion';
 import { toast } from 'sonner';
 import * as fabric from 'fabric';
@@ -17,115 +18,160 @@ import { textEffectPresets, applyTextEffect } from '../../config/textProperties'
 import { shapeStylePresets, shapeBorderPresets, applyShapeStyle, applyBorderPreset, shadowPresets, applyShadowToShape } from '../../config/shapeProperties';
 import { colorToHex } from '../../lib/utils';
 
-const LayerItem = ({ layer, index, selectedLayers, selectLayer, toggleLayerVisibility, toggleLayerLock, expandedGroups, toggleGroupExpansion, reorderLayers, ungroupLayer }) => {
+const LayerItem = ({ layer, index, selectedLayers, selectLayer, toggleLayerVisibility, toggleLayerLock, expandedGroups, toggleGroupExpansion, reorderLayers, ungroupLayer, setLayerOpacity, layerMetadata }) => {
   const isExpanded = expandedGroups.has(layer.id);
   const isSelected = selectedLayers.includes(layer.id);
+  const [showProperties, setShowProperties] = useState(false);
+  const layerMeta = layerMetadata?.get?.(layer.id);
+  const opacity = layerMeta?.opacity ?? layer.opacity ?? 100;
+  const filters = layerMeta?.filters ?? layer.filters ?? [];
 
   return (
     <Reorder.Item key={layer.id} value={layer}>
       <div
-        className={`flex items-center gap-2 p-3 rounded-lg border transition-colors ${
+        className={`flex flex-col gap-2 p-3 rounded-lg border transition-colors ${
           isSelected
             ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/20'
             : 'border-slate-200 dark:border-slate-700 hover:border-indigo-500 dark:hover:border-indigo-400 bg-slate-50 dark:bg-slate-800'
         }`}
       >
-        <Button
-          onClick={(e) => {
-            e.stopPropagation();
-            selectLayer(layer.id);
-          }}
-          variant="ghost"
-          size="icon"
-          className="h-6 w-6 p-0"
-        >
-          {isSelected ? (
-            <CheckSquare className="w-4 h-4 text-indigo-600" />
-          ) : (
-            <Square className="w-4 h-4 text-slate-400" />
-          )}
-        </Button>
-        
-        {layer.isGroup && (
+        <div className="flex items-center gap-2">
           <Button
             onClick={(e) => {
               e.stopPropagation();
-              toggleGroupExpansion(layer.id);
+              selectLayer(layer.id);
             }}
             variant="ghost"
             size="icon"
             className="h-6 w-6 p-0"
           >
-            {isExpanded ? (
-              <ChevronDown className="w-4 h-4 text-slate-400" />
+            {isSelected ? (
+              <CheckSquare className="w-4 h-4 text-indigo-600" />
             ) : (
-              <ChevronRight className="w-4 h-4 text-slate-400" />
+              <Square className="w-4 h-4 text-slate-400" />
             )}
           </Button>
-        )}
-        
-        <GripVertical className="w-4 h-4 text-slate-400 cursor-grab active:cursor-grabbing" />
-        <div className="flex-1">
-          <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
-            {layer.name}
-            {layer.isGroup && ` (${layer.children.length})`}
-          </p>
-          <p className="text-xs text-slate-500 dark:text-slate-400">{layer.type}</p>
-        </div>
-        <Button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleLayerVisibility(index);
-          }}
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-        >
-          {layer.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
-        </Button>
-        <Button
-          onClick={(e) => {
-            e.stopPropagation();
-            toggleLayerLock(index);
-          }}
-          variant="ghost"
-          size="icon"
-          className="h-8 w-8"
-        >
-          {layer.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
-        </Button>
-        {layer.isGroup && (
+          
+          {layer.isGroup && (
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                toggleGroupExpansion(layer.id);
+              }}
+              variant="ghost"
+              size="icon"
+              className="h-6 w-6 p-0"
+            >
+              {isExpanded ? (
+                <ChevronDown className="w-4 h-4 text-slate-400" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-slate-400" />
+              )}
+            </Button>
+          )}
+          
+          <GripVertical className="w-4 h-4 text-slate-400 cursor-grab active:cursor-grabbing" />
+          <div className="flex-1">
+            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+              {layer.name}
+              {layer.isGroup && ` (${layer.children.length})`}
+            </p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">{layer.type}</p>
+          </div>
           <Button
             onClick={(e) => {
               e.stopPropagation();
-              ungroupLayer(layer.id);
+              setShowProperties(!showProperties);
             }}
             variant="ghost"
             size="icon"
             className="h-8 w-8"
-            title="Ungroup"
+            title="Layer Properties"
           >
-            <Ungroup className="w-4 h-4" />
+            <Settings className="w-4 h-4" />
           </Button>
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleLayerVisibility(index);
+            }}
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+          >
+            {layer.visible ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+          </Button>
+          <Button
+            onClick={(e) => {
+              e.stopPropagation();
+              toggleLayerLock(index);
+            }}
+            variant="ghost"
+            size="icon"
+            className="h-8 w-8"
+          >
+            {layer.locked ? <Lock className="w-4 h-4" /> : <Unlock className="w-4 h-4" />}
+          </Button>
+          {layer.isGroup && (
+            <Button
+              onClick={(e) => {
+                e.stopPropagation();
+                ungroupLayer(layer.id);
+              }}
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8"
+              title="Ungroup"
+            >
+              <Ungroup className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+        
+        {/* Layer Properties Panel - MiniPaint-style Layer Details */}
+        {showProperties && (
+          <div className="mt-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+            <LayerDetailsPanel layerId={layer.id} />
+            
+            {/* Filters List */}
+            {filters.length > 0 && (
+              <div className="mt-4 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
+                <label className="text-xs font-medium text-slate-600 dark:text-slate-400">Applied Filters</label>
+                <div className="space-y-1">
+                  {filters.map((filter) => (
+                    <div key={filter.id} className="flex items-center justify-between text-xs bg-slate-100 dark:bg-slate-700 px-2 py-1 rounded">
+                      <span className="capitalize">{filter.name}</span>
+                      <span className="text-slate-500">
+                        {filter.params?.value !== undefined ? `${filter.params.value}%` : ''}
+                        {filter.params?.radius !== undefined ? `Radius: ${filter.params.radius}` : ''}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
       
       {layer.isGroup && isExpanded && layer.children.length > 0 && (
         <div className="ml-4 mt-2 space-y-2">
           {layer.children.map((childLayer, childIndex) => (
-            <LayerItem
-              key={childLayer.id}
-              layer={childLayer}
-              index={index}
-              selectedLayers={selectedLayers}
-              selectLayer={selectLayer}
-              toggleLayerVisibility={toggleLayerVisibility}
-              toggleLayerLock={toggleLayerLock}
-              expandedGroups={expandedGroups}
-              toggleGroupExpansion={toggleGroupExpansion}
-              reorderLayers={reorderLayers}
-              ungroupLayer={ungroupLayer}
-            />
+                  <LayerItem
+                    key={childLayer.id}
+                    layer={childLayer}
+                    index={index}
+                    selectedLayers={selectedLayers}
+                    selectLayer={selectLayer}
+                    toggleLayerVisibility={toggleLayerVisibility}
+                    toggleLayerLock={toggleLayerLock}
+                    expandedGroups={expandedGroups}
+                    toggleGroupExpansion={toggleGroupExpansion}
+                    reorderLayers={reorderLayers}
+                    ungroupLayer={ungroupLayer}
+                    setLayerOpacity={setLayerOpacity}
+                    layerMetadata={layerMetadata}
+                  />
           ))}
         </div>
       )}
@@ -153,7 +199,10 @@ const RightSidebar = () => {
     applyFilterPreset,
     removeFilters,
     activeFilterPreset,
-    setActiveFilterPreset
+    setActiveFilterPreset,
+    layerMetadata,
+    setLayerOpacity,
+    layerManagerRef
   } = useEditor();
   const [fontSearch, setFontSearch] = useState('');
   const [filteredFonts, setFilteredFonts] = useState(allGoogleFonts.slice(0, 100));
@@ -310,31 +359,182 @@ const RightSidebar = () => {
   };
 
   const reorderLayers = (newLayers) => {
-    if (canvas) {
-      const objects = canvas.getObjects();
+    if (!canvas || !layerMetadata || !newLayers || newLayers.length === 0) {
+      return;
+    }
+    
+    const layerManager = layerManagerRef?.current;
+    if (!layerManager) {
+      return;
+    }
+    
+    const objects = canvas.getObjects();
+    if (objects.length === 0 || objects.length !== newLayers.length) {
+      return;
+    }
+    
+    // Create mapping from layer ID to Fabric object using layerMetadata
+    const layerToObjectMap = new Map();
+    objects.forEach((obj: any) => {
+      const fabricId = obj.id || obj.name;
+      if (fabricId) {
+        // Find layer by fabricId
+        for (const [layerId, layerMeta] of layerMetadata.entries()) {
+          if (layerMeta.fabricObjectId === fabricId) {
+            layerToObjectMap.set(layerId, obj);
+            break;
+          }
+        }
+      }
+    });
+    
+    // If we couldn't map all layers, try to create missing mappings
+    if (layerToObjectMap.size !== newLayers.length) {
+      // Try to match by index as fallback
+      newLayers.forEach((layer, index) => {
+        if (!layerToObjectMap.has(layer.id) && index < objects.length) {
+          const obj = objects[index];
+          if (obj) {
+            const fabricId = obj.id || obj.name || `obj-${index}`;
+            if (!obj.id) obj.id = fabricId;
+            layerToObjectMap.set(layer.id, obj);
+          }
+        }
+      });
+    }
+    
+    // Final check - if still incomplete, abort
+    if (layerToObjectMap.size !== newLayers.length) {
+      return;
+    }
+    
+    // Update layer orders in LayerManager (MiniPaint-style)
+    // Higher order = rendered on top (like MiniPaint's b.order - a.order sorting)
+    // In UI, first layer = top, so we assign highest order to first layer
+    newLayers.forEach((layer, index) => {
+      const layerMeta = layerMetadata.get(layer.id);
+      if (layerMeta) {
+        // Assign order: first layer gets highest order (rendered on top)
+        const newOrder = newLayers.length - index;
+        layerManager.reorderLayer(layerMeta.id, newOrder);
+      }
+    });
+    
+    // Calculate target positions for all objects
+    // Fabric.js: index 0 = bottom layer, last index = top layer
+    // UI: first layer in list = top layer, so we reverse the mapping
+    const targetPositions = new Map();
+    newLayers.forEach((layer, uiIndex) => {
+      const obj = layerToObjectMap.get(layer.id);
+      if (obj) {
+        // Reverse mapping: UI first (index 0) = Canvas top (last index)
+        const targetIndex = newLayers.length - 1 - uiIndex;
+        targetPositions.set(obj, targetIndex);
+      }
+    });
+    
+    // Build moves array with current and target positions
+    const moves = [];
+    objects.forEach((obj: any) => {
+      const targetIndex = targetPositions.get(obj);
+      if (targetIndex !== undefined) {
+        const currentIndex = objects.indexOf(obj);
+        if (currentIndex !== targetIndex) {
+          moves.push({ obj, currentIndex, targetIndex });
+        }
+      }
+    });
+    
+    // Execute moves - use the most reliable method for instant updates
+    if (moves.length > 0) {
+      // Build the correct order array: objects in their target positions
+      // Fabric.js: index 0 = bottom, last index = top
+      const reorderedObjects = new Array(objects.length);
       
-      // Create mapping from current objects to their layer info
-      const objectMap = new Map();
-      objects.forEach((obj, index) => {
-        const layerId = `layer-${objects.length - 1 - index}`; // Match the layer ID generation in updateLayers
-        objectMap.set(layerId, obj);
+      // Fill the array with objects in their target positions
+      objects.forEach((obj: any) => {
+        const targetIndex = targetPositions.get(obj);
+        if (targetIndex !== undefined && targetIndex >= 0 && targetIndex < objects.length) {
+          reorderedObjects[targetIndex] = obj;
+        }
       });
       
-      // Map new layer order to objects (layers are top-to-bottom, canvas is bottom-to-top)
-      const reorderedObjects = [];
-      for (let i = newLayers.length - 1; i >= 0; i--) {
-        const obj = objectMap.get(newLayers[i].id);
-        if (obj) {
-          reorderedObjects.push(obj);
+      // Fill any missing slots with remaining objects (safety check)
+      const usedIndices = new Set();
+      objects.forEach((obj: any) => {
+        const targetIndex = targetPositions.get(obj);
+        if (targetIndex !== undefined) {
+          usedIndices.add(targetIndex);
+        }
+      });
+      
+      // Find any objects not yet placed
+      const unplacedObjects = objects.filter(obj => !targetPositions.has(obj));
+      let unplacedIndex = 0;
+      for (let i = 0; i < reorderedObjects.length; i++) {
+        if (reorderedObjects[i] === undefined && unplacedObjects[unplacedIndex]) {
+          reorderedObjects[i] = unplacedObjects[unplacedIndex];
+          unplacedIndex++;
         }
       }
       
-      // Clear and re-add in new order
-      canvas.clear();
-      reorderedObjects.forEach(obj => canvas.add(obj));
-      canvas.renderAll();
+      // Remove any undefined slots
+      const finalOrder = reorderedObjects.filter(obj => obj !== undefined);
+      
+      // Check if order actually changed
+      let orderChanged = false;
+      if (finalOrder.length === objects.length) {
+        for (let i = 0; i < objects.length; i++) {
+          if (objects[i] !== finalOrder[i]) {
+            orderChanged = true;
+            break;
+          }
+        }
+      } else {
+        orderChanged = true; // Length mismatch means order changed
+      }
+      
+      if (orderChanged && finalOrder.length === objects.length) {
+        // Store active object to restore selection
+        const activeObj = canvas.getActiveObject();
+        
+        // Disable rendering during reorder for performance (instant update)
+        const originalRenderOnAddRemove = canvas.renderOnAddRemove;
+        canvas.renderOnAddRemove = false;
+        
+        // Remove all objects (without rendering)
+        const objectsToRemove = [...objects]; // Copy array to avoid modification during iteration
+        objectsToRemove.forEach((obj: any) => {
+          canvas.remove(obj);
+        });
+        
+        // Add back in correct order (Fabric.js: last added = top)
+        finalOrder.forEach((obj: any) => {
+          canvas.add(obj);
+        });
+        
+        // Restore rendering setting
+        canvas.renderOnAddRemove = originalRenderOnAddRemove;
+        
+        // Restore active object if it exists
+        if (activeObj) {
+          canvas.setActiveObject(activeObj);
+        }
+        
+        // CRITICAL: Immediate render for instant visual feedback (MiniPaint-style)
+        canvas.renderAll();
+        canvas.requestRenderAll();
+        
+        // Update UI and save history (non-blocking)
+        requestAnimationFrame(() => {
+          updateLayers();
+          saveToHistory();
+        });
+      } else {
+        updateLayers();
+      }
+    } else {
       updateLayers();
-      saveToHistory();
     }
   };
 
@@ -940,6 +1140,8 @@ const setAsBackground = () => {
                     toggleGroupExpansion={toggleGroupExpansion}
                     reorderLayers={reorderLayers}
                     ungroupLayer={ungroupLayer}
+                    setLayerOpacity={setLayerOpacity}
+                    layerMetadata={layerMetadata}
                   />
                 ))}
               </Reorder.Group>

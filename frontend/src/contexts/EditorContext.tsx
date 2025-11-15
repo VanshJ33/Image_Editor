@@ -2,6 +2,8 @@ import React, { createContext, useContext, useState, useCallback, useRef, useEff
 import { toast } from 'sonner';
 import { Group, Rect, Circle, Text, FabricImage, Path, Canvas as FabricCanvas, FabricObject } from 'fabric';
 import * as fabric from 'fabric';
+import { LayerManager, LayerMetadata } from '../utils/layerManager';
+import { LayerRenderer } from '../utils/layerRenderer';
 
 const EditorContext = createContext<any>(null);
 
@@ -46,6 +48,11 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const [isDrawingCustom, setIsDrawingCustom] = useState<boolean>(false);
   const [customPath, setCustomPath] = useState<any[]>([]);
   const [gifHandler, setGifHandler] = useState<any>(null);
+  
+  // Layer management system (MiniPaint-inspired)
+  const layerManagerRef = useRef<LayerManager>(new LayerManager());
+  const [layerMetadata, setLayerMetadata] = useState<Map<string, LayerMetadata>>(new Map());
+  
   // Initialize history when canvas is first set
   useEffect(() => {
     if (canvas && !isInitialized.current) {
@@ -55,36 +62,77 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       setHistoryStep(0);
       isInitialized.current = true;
     }
-  }, [canvas]);
+  }, [canvas])
 
   const updateLayers = useCallback(() => {
     if (canvas) {
       const objects = canvas.getObjects();
-      const layerList: any[] = [];
+      const layerManager = layerManagerRef.current;
       
-      const processObject = (obj: any, index: number, parentId: string | null = null) => {
-        const layerId = `layer-${objects.length - 1 - index}`;
+      // Sync layer manager with Fabric objects
+      objects.forEach((obj: any, index: number) => {
+        const fabricId = obj.id || obj.name || `obj-${index}`;
+        if (!obj.id) obj.id = fabricId; // Ensure object has ID
+        
+        // Get or create layer metadata
+        let layerMeta = layerManager.getLayerByFabricId(fabricId);
+        if (!layerMeta) {
+          layerMeta = layerManager.createLayer(
+            fabricId,
+            obj.type || 'object',
+            obj.name || `${obj.type || 'object'} #${index + 1}`
+          );
+        }
+        
+        // Update layer metadata from object
+        // Preserve existing order if set (from manual reordering)
+        // Only set default order if not already set
+        const currentOrder = layerMeta.order !== undefined ? layerMeta.order : (objects.length - 1 - index);
+        layerManager.updateLayer(layerMeta.id, {
+          name: obj.name || layerMeta.name,
+          type: obj.type || layerMeta.type,
+          visible: obj.visible !== false,
+          locked: obj.selectable === false,
+          order: currentOrder,
+        });
+        
+        // Apply layer properties to object
+        LayerRenderer.applyLayerToObject(obj, layerMeta);
+      });
+      
+      // Don't auto-reorder in updateLayers - let manual reordering handle it
+      // This prevents conflicts with drag-and-drop reordering
+      // Objects are already in correct order from reorderLayers function
+      
+      // Build layer list for UI (sorted by order descending - top layer first)
+      const layerList: any[] = [];
+      const sortedLayers = layerManager.getSortedLayers();
+      
+      const processObject = (obj: any, layerMeta: LayerMetadata | undefined, parentId: string | null = null) => {
+        const layerId = layerMeta?.id || `layer-${Date.now()}`;
         const layer: any = {
           id: layerId,
-          name:
-            obj?.name ||
-            (obj?.type === 'textbox'
-              ? (obj?.text ? obj.text.substring(0, 20) + '...' : 'textbox')
-              : obj?.type) || 'Layer',
+          name: layerMeta?.name || obj?.name || (obj?.type === 'textbox'
+            ? (obj?.text ? obj.text.substring(0, 20) + '...' : 'textbox')
+            : obj?.type) || 'Layer',
           type: obj?.type || 'object',
-          visible: obj?.visible !== false,
-          locked: obj?.selectable === false,
-          index: objects.length - 1 - index,
+          visible: layerMeta?.visible !== false && obj?.visible !== false,
+          locked: layerMeta?.locked || obj?.selectable === false,
+          opacity: layerMeta?.opacity || 100,
+          composition: layerMeta?.composition || 'source-over',
+          filters: layerMeta?.filters || [],
+          order: layerMeta?.order || 0,
           parentId: parentId,
           isGroup: obj?.type === 'group',
           children: []
         };
         
         if (obj?.type === 'group' && typeof obj.getObjects === 'function') {
-          // Process children of the group
           const groupObjects = obj.getObjects();
           groupObjects.forEach((childObj: any) => {
-            const childLayer = processObject(childObj, index, layerId);
+            const childFabricId = childObj.id || childObj.name;
+            const childLayerMeta = layerManager.getLayerByFabricId(childFabricId);
+            const childLayer = processObject(childObj, childLayerMeta, layerId);
             layer.children.push(childLayer);
           });
         }
@@ -92,12 +140,23 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         return layer;
       };
       
-      objects.forEach((obj, index) => {
-        const layer = processObject(obj, index);
-        layerList.push(layer);
+      // Create layers from sorted objects (reverse for UI - top layer first)
+      sortedLayers.forEach((layerMeta) => {
+        const obj = objects.find((o: any) => (o.id || o.name) === layerMeta.fabricObjectId);
+        if (obj) {
+          const layer = processObject(obj, layerMeta);
+          layerList.push(layer);
+        }
       });
       
-      setLayers(layerList.reverse());
+      setLayers(layerList);
+      
+      // Update layer metadata map
+      const metadataMap = new Map<string, LayerMetadata>();
+      sortedLayers.forEach(layer => {
+        metadataMap.set(layer.id, layer);
+      });
+      setLayerMetadata(metadataMap);
     }
   }, [canvas]);
 
@@ -1606,6 +1665,104 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [canvas, saveToHistory]);
 
+  // Layer management functions (MiniPaint-inspired)
+  const setLayerOpacity = useCallback((layerId: string, opacity: number) => {
+    if (!canvas) return;
+    
+    const layerManager = layerManagerRef.current;
+    const layerMeta = layerManager.getLayer(layerId);
+    
+    if (layerMeta && layerMeta.fabricObjectId) {
+      const obj = canvas.getObjects().find((o: any) => o.id === layerMeta.fabricObjectId);
+      if (obj) {
+        layerManager.setOpacity(layerId, opacity);
+        LayerRenderer.applyLayerToObject(obj, layerMeta);
+        canvas.renderAll();
+        updateLayers();
+        saveToHistory();
+      }
+    }
+  }, [canvas, updateLayers, saveToHistory]);
+
+  const setLayerComposition = useCallback((layerId: string, composition: string) => {
+    if (!canvas) return;
+    
+    const layerManager = layerManagerRef.current;
+    layerManager.setComposition(layerId, composition);
+    
+    const layerMeta = layerManager.getLayer(layerId);
+    if (layerMeta && layerMeta.fabricObjectId) {
+      const obj = canvas.getObjects().find((o: any) => o.id === layerMeta.fabricObjectId);
+      if (obj) {
+        // Note: Fabric.js has limited blend mode support
+        // For full support, we'd need custom rendering
+        LayerRenderer.applyLayerToObject(obj, layerMeta);
+        canvas.renderAll();
+        updateLayers();
+        saveToHistory();
+      }
+    }
+  }, [canvas, updateLayers, saveToHistory]);
+
+  const addLayerFilter = useCallback((layerId: string, filterName: string, params: Record<string, any>) => {
+    if (!canvas) return;
+    
+    const layerManager = layerManagerRef.current;
+    const filterId = layerManager.addFilter(layerId, filterName, params);
+    
+    const layerMeta = layerManager.getLayer(layerId);
+    if (layerMeta && layerMeta.fabricObjectId) {
+      const obj = canvas.getObjects().find((o: any) => o.id === layerMeta.fabricObjectId);
+      if (obj) {
+        LayerRenderer.applyFiltersToObject(obj, layerMeta.filters);
+        canvas.renderAll();
+        updateLayers();
+        saveToHistory();
+      }
+    }
+    
+    return filterId;
+  }, [canvas, updateLayers, saveToHistory]);
+
+  const removeLayerFilter = useCallback((layerId: string, filterId: string) => {
+    if (!canvas) return;
+    
+    const layerManager = layerManagerRef.current;
+    layerManager.removeFilter(layerId, filterId);
+    
+    const layerMeta = layerManager.getLayer(layerId);
+    if (layerMeta && layerMeta.fabricObjectId) {
+      const obj = canvas.getObjects().find((o: any) => o.id === layerMeta.fabricObjectId);
+      if (obj) {
+        LayerRenderer.applyFiltersToObject(obj, layerMeta.filters);
+        canvas.renderAll();
+        updateLayers();
+        saveToHistory();
+      }
+    }
+  }, [canvas, updateLayers, saveToHistory]);
+
+  const updateLayerFilter = useCallback((layerId: string, filterId: string, params: Record<string, any>) => {
+    if (!canvas) return;
+    
+    const layerManager = layerManagerRef.current;
+    layerManager.updateFilter(layerId, filterId, params);
+    
+    const layerMeta = layerManager.getLayer(layerId);
+    if (layerMeta && layerMeta.fabricObjectId) {
+      const obj = canvas.getObjects().find((o: any) => o.id === layerMeta.fabricObjectId);
+      if (obj) {
+        const filter = layerMeta.filters.find(f => f.id === filterId);
+        if (filter) {
+          LayerRenderer.updateFilterOnObject(obj, filterId, filter.name, filter.params);
+          canvas.renderAll();
+          updateLayers();
+          saveToHistory();
+        }
+      }
+    }
+  }, [canvas, updateLayers, saveToHistory]);
+
   // Add keyboard shortcuts for undo/redo
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -1708,7 +1865,15 @@ export const EditorProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     applyTemplateContrast,
     applyBackgroundOpacity,
     gifHandler,
-    setGifHandler
+    setGifHandler,
+    // Layer management
+    layerMetadata,
+    setLayerOpacity,
+    setLayerComposition,
+    addLayerFilter,
+    removeLayerFilter,
+    updateLayerFilter,
+    layerManagerRef
   };
 
   return <EditorContext.Provider value={value}>{children}</EditorContext.Provider>;

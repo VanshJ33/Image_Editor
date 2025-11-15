@@ -5,9 +5,9 @@
  * Handles filter synchronization, object updates, and event coordination.
  */
 
-import * as PIXI from 'pixi.js';
-import { ColorMatrixFilter, BlurFilter } from 'pixi.js';
-import { getPixiApp, getSprite, addOrUpdateSprite, syncSpriteFromFabric } from './pixiLayer';
+// import * as PIXI from 'pixi.js';
+// import { ColorMatrixFilter, BlurFilter } from 'pixi.js';
+// import { getPixiApp, getSprite, addOrUpdateSprite, syncSpriteFromFabric } from './pixiLayer';
 
 /**
  * Generate or get ID for a Fabric object
@@ -28,14 +28,8 @@ function getOrCreateObjectId(fabricObject) {
 }
 
 export function syncFiltersToPixi(fabricObject, pixiAppOverride = null) {
-  if (!fabricObject || fabricObject.type !== 'image') {
-    return;
-  }
-
-  const pixiApp = pixiAppOverride || getPixiApp();
-  if (!pixiApp) {
-    return; // Pixi not available, fallback to Fabric-only
-  }
+  // PixiJS disabled - using Fabric-only rendering
+  return;
 
   try {
     const fabricObjectId = getOrCreateObjectId(fabricObject);
@@ -141,14 +135,8 @@ export function syncFiltersToPixi(fabricObject, pixiAppOverride = null) {
  * @param {fabric.Canvas} fabricCanvas - Fabric canvas instance
  */
 export function setupFabricPixiSync(fabricCanvas) {
-  if (!fabricCanvas) {
-    return;
-  }
-
-  const pixiApp = getPixiApp();
-  if (!pixiApp) {
-    return; // Pixi not available
-  }
+  // PixiJS disabled - using Fabric-only rendering
+  return;
 
   try {
     // Sync on object added

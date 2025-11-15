@@ -806,7 +806,9 @@ const Canvas = () => {
     if (!canvas || !isDrawingCustom) return;
 
     const handleMouseDown = (e) => {
-      if (!isDrawingCustom) return;
+      // Only handle if custom shape drawing is active
+      // Don't interfere if canvas selection is disabled (shape drawing might be active)
+      if (!isDrawingCustom || canvas.selection === false) return;
       
       const pointer = canvas.getPointer(e.e);
       const newPath = [...customPath, { x: pointer.x, y: pointer.y }];

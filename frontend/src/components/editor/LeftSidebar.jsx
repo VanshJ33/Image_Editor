@@ -7,9 +7,11 @@ import { Input } from '../ui/input';
 import { LayoutTemplate, Upload, Type, Shapes, Image as ImageIcon, Sparkles, Palette, Search, Wand2, Zap, Crown, Layers3, Paintbrush, Images } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { useEditor } from '../../contexts/EditorContext';
+import * as fabric from 'fabric';
 import { Textbox, Rect, Circle, Triangle, Line, FabricImage, FabricText, Polygon, Ellipse, Path, Gradient, Group, FabricObject } from 'fabric';
 import { applySpacingPreset, textSpacingPresets, defaultTextProperties, textEffectPresets, applyTextEffect, textHeadingPresets, textCurvePresets, createCurvedTextGroup, applyCurvePreset } from '../../config/textProperties';
 import { defaultShapeProperties, commonShapeColors, createShape, createPresetShape } from '../../config/shapeProperties';
+import ShapeDrawingTool from '../../utils/shapeDrawingTool';
 
 import { toast } from 'sonner';
 import { loadGoogleFont } from '../../utils/googleFonts';
@@ -222,6 +224,12 @@ const LeftSidebar = () => {
   const containerRef = useRef(null);
   const backgroundObjRef = useRef(null);
   const renderTimeoutRef = useRef(null);
+  const shapeDrawingToolRef = useRef(null);
+  const [isDrawingShape, setIsDrawingShape] = useState(false);
+  const [shapeDrawingType, setShapeDrawingType] = useState(null);
+  const [shapeDrawingParams, setShapeDrawingParams] = useState(null);
+  const [shapeStartPoint, setShapeStartPoint] = useState(null);
+  const [currentDrawingShape, setCurrentDrawingShape] = useState(null);
 
 
 
@@ -403,24 +411,374 @@ const LeftSidebar = () => {
     }
   };
 
-  const addShape = (shapeType) => {
+  // Initialize shape drawing tool
+  useEffect(() => {
     if (canvas) {
-      let shape;
-      const getRandomColor = () => commonShapeColors[Math.floor(Math.random() * commonShapeColors.length)];
-      const baseOptions = { left: 100, top: 100, fill: getRandomColor() };
-      switch (shapeType) {
+      // Always create a new instance when canvas changes
+      if (shapeDrawingToolRef.current) {
+        shapeDrawingToolRef.current.deactivate();
+      }
+      shapeDrawingToolRef.current = new ShapeDrawingTool(canvas);
+    }
+    
+    return () => {
+      // Cleanup on unmount
+      if (shapeDrawingToolRef.current) {
+        shapeDrawingToolRef.current.deactivate();
+      }
+    };
+  }, [canvas]);
+
+  // Direct shape drawing handlers (simpler approach)
+  useEffect(() => {
+    if (!canvas || !isDrawingShape || !shapeDrawingType) return;
+
+    const handleMouseDown = (e) => {
+      // Only handle if clicking on canvas background
+      if (e.target && e.target.type && e.target !== canvas.backgroundImage) {
+        setIsDrawingShape(false);
+        setShapeDrawingType(null);
+        return;
+      }
+
+      const pointer = canvas.getPointer(e.e);
+      setShapeStartPoint({ x: pointer.x, y: pointer.y });
+
+      // Create initial shape
+      const params = shapeDrawingParams || {};
+      let shape = null;
+
+      switch (shapeDrawingType) {
         case 'rectangle':
-          shape = createShape('rectangle', { ...baseOptions, width: 200, height: 150, rx: 8, ry: 8 });
+          shape = new Rect({
+            left: pointer.x,
+            top: pointer.y,
+            width: 0,
+            height: 0,
+            fill: params.fill || '#667eea',
+            stroke: params.stroke || 'transparent',
+            strokeWidth: params.strokeWidth || 0,
+            rx: params.rx || 0,
+            ry: params.ry || 0,
+            selectable: false,
+            evented: false,
+            opacity: 1,
+            visible: true,
+          });
           break;
+        case 'ellipse':
         case 'circle':
-          shape = createShape('circle', { ...baseOptions, radius: 75 });
+          shape = new Ellipse({
+            left: pointer.x,
+            top: pointer.y,
+            rx: 0,
+            ry: 0,
+            fill: params.fill || '#667eea',
+            stroke: params.stroke || 'transparent',
+            strokeWidth: params.strokeWidth || 0,
+            selectable: false,
+            evented: false,
+            opacity: 1,
+            visible: true,
+          });
           break;
         case 'triangle':
-          shape = createShape('triangle', { ...baseOptions, width: 150, height: 150 });
+          shape = new Triangle({
+            left: pointer.x,
+            top: pointer.y,
+            width: 0,
+            height: 0,
+            fill: params.fill || '#667eea',
+            stroke: params.stroke || 'transparent',
+            strokeWidth: params.strokeWidth || 0,
+            selectable: false,
+            evented: false,
+            opacity: 1,
+            visible: true,
+          });
           break;
         case 'line':
-          shape = createShape('line', { left: 100, top: 100, x1: 50, y1: 100, x2: 200, y2: 100, stroke: '#1e293b', strokeWidth: 3 });
+          shape = new Line(
+            [pointer.x, pointer.y, pointer.x, pointer.y],
+            {
+              stroke: params.stroke || '#1e293b',
+              strokeWidth: params.strokeWidth || 3,
+              selectable: false,
+              evented: false,
+              opacity: 1,
+              visible: true,
+            }
+          );
           break;
+      }
+
+      if (shape) {
+        shape.id = `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        canvas.add(shape);
+        setCurrentDrawingShape(shape);
+        canvas.renderAll();
+      }
+    };
+
+    const handleMouseMove = (e) => {
+      if (!currentDrawingShape || !shapeStartPoint) return;
+
+      const pointer = canvas.getPointer(e.e);
+      const startX = shapeStartPoint.x;
+      const startY = shapeStartPoint.y;
+      const currentX = pointer.x;
+      const currentY = pointer.y;
+
+      let left = Math.min(startX, currentX);
+      let top = Math.min(startY, currentY);
+      let width = Math.abs(currentX - startX);
+      let height = Math.abs(currentY - startY);
+
+      if (width < 1) width = 1;
+      if (height < 1) height = 1;
+
+      const isPerfectShape = e.e && (e.e.ctrlKey || e.e.metaKey);
+
+      switch (shapeDrawingType) {
+        case 'rectangle':
+          if (isPerfectShape) {
+            const size = Math.max(width, height);
+            width = size;
+            height = size;
+            if (startX > currentX) left = startX - size;
+            if (startY > currentY) top = startY - size;
+          }
+          currentDrawingShape.set({ left, top, width, height });
+          break;
+        case 'ellipse':
+        case 'circle':
+          if (isPerfectShape || shapeDrawingType === 'circle') {
+            const radius = Math.max(width, height) / 2;
+            width = radius * 2;
+            height = radius * 2;
+            if (startX > currentX) left = startX - width;
+            if (startY > currentY) top = startY - height;
+          }
+          currentDrawingShape.set({ left, top, rx: width / 2, ry: height / 2 });
+          break;
+        case 'triangle':
+          if (isPerfectShape) {
+            const size = Math.max(width, height);
+            width = size;
+            height = size;
+          }
+          currentDrawingShape.set({ left, top, width, height });
+          break;
+        case 'line':
+          if (isPerfectShape) {
+            const dx = Math.abs(currentX - startX);
+            const dy = Math.abs(currentY - startY);
+            if (dx > dy) {
+              currentDrawingShape.set({ x1: startX, y1: startY, x2: currentX, y2: startY });
+            } else {
+              currentDrawingShape.set({ x1: startX, y1: startY, x2: startX, y2: currentY });
+            }
+          } else {
+            currentDrawingShape.set({ x1: startX, y1: startY, x2: currentX, y2: currentY });
+          }
+          break;
+      }
+
+      currentDrawingShape.setCoords();
+      canvas.renderAll();
+    };
+
+    const handleMouseUp = (e) => {
+      if (!currentDrawingShape || !shapeStartPoint) {
+        setIsDrawingShape(false);
+        setShapeDrawingType(null);
+        setCurrentDrawingShape(null);
+        setShapeStartPoint(null);
+        return;
+      }
+
+      const pointer = canvas.getPointer(e.e);
+      const width = Math.abs(pointer.x - shapeStartPoint.x);
+      const height = Math.abs(pointer.y - shapeStartPoint.y);
+
+      if (width < 5 && height < 5) {
+        canvas.remove(currentDrawingShape);
+        canvas.renderAll();
+      } else {
+        currentDrawingShape.set({
+          selectable: true,
+          evented: true,
+        });
+        currentDrawingShape.setCoords();
+        
+        setTimeout(() => {
+          canvas.setActiveObject(currentDrawingShape);
+          canvas.renderAll();
+          updateLayers();
+          saveToHistory();
+        }, 50);
+      }
+
+      setIsDrawingShape(false);
+      setShapeDrawingType(null);
+      setCurrentDrawingShape(null);
+      setShapeStartPoint(null);
+    };
+
+    // Disable selection during drawing
+    canvas.selection = false;
+    canvas.defaultCursor = 'crosshair';
+
+    canvas.on('mouse:down', handleMouseDown);
+    canvas.on('mouse:move', handleMouseMove);
+    canvas.on('mouse:up', handleMouseUp);
+
+    return () => {
+      canvas.off('mouse:down', handleMouseDown);
+      canvas.off('mouse:move', handleMouseMove);
+      canvas.off('mouse:up', handleMouseUp);
+      canvas.selection = true;
+      canvas.defaultCursor = 'default';
+    };
+  }, [canvas, isDrawingShape, shapeDrawingType, shapeDrawingParams, currentDrawingShape, shapeStartPoint, updateLayers, saveToHistory]);
+
+  // Handle shape drawing completion and deactivation
+  useEffect(() => {
+    if (!canvas) return;
+
+    const handleObjectAdded = (e) => {
+      const obj = e.target;
+      // Check if this is a shape we just drew
+      if (obj && (obj.type === 'rect' || obj.type === 'ellipse' || obj.type === 'triangle' || obj.type === 'line')) {
+        // Ensure object has ID for layer management
+        if (!obj.id) {
+          obj.id = `shape-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+        }
+        
+        // Deactivate drawing tool after shape is created
+        if (shapeDrawingToolRef.current) {
+          shapeDrawingToolRef.current.deactivate();
+        }
+        
+        // Update layers and save history
+        setTimeout(() => {
+          updateLayers();
+          saveToHistory();
+        }, 100);
+      }
+    };
+
+    const handleSelectionCreated = () => {
+      // Deactivate drawing tool when user selects an object (but not during drawing)
+      if (shapeDrawingToolRef.current && !shapeDrawingToolRef.current.isDrawing) {
+        shapeDrawingToolRef.current.deactivate();
+      }
+    };
+
+    canvas.on('object:added', handleObjectAdded);
+    canvas.on('selection:created', handleSelectionCreated);
+
+    return () => {
+      canvas.off('object:added', handleObjectAdded);
+      canvas.off('selection:created', handleSelectionCreated);
+    };
+  }, [canvas, updateLayers, saveToHistory]);
+
+  const addShape = (shapeType) => {
+    if (!canvas || !shapeDrawingToolRef.current) return;
+
+    // Deactivate any previous drawing tool
+    shapeDrawingToolRef.current.deactivate();
+
+    // Get random color for shape
+      const getRandomColor = () => commonShapeColors[Math.floor(Math.random() * commonShapeColors.length)];
+    const randomColor = getRandomColor();
+
+    // Map shape types and prepare parameters
+    let actualShapeType = shapeType;
+    let params = {
+      fill: randomColor,
+      stroke: 'transparent',
+      strokeWidth: 0,
+    };
+
+    // Handle basic shapes with drag-to-draw (MiniPaint style)
+    if (shapeType === 'rectangle' || shapeType === 'circle' || 
+        shapeType === 'ellipse' || shapeType === 'triangle' || 
+        shapeType === 'line') {
+      
+      // Prepare parameters for basic shapes
+      switch (shapeType) {
+        case 'rectangle':
+          params.rx = 8;
+          params.ry = 8;
+          actualShapeType = 'rectangle';
+          break;
+        case 'circle':
+          actualShapeType = 'circle';
+          break;
+        case 'ellipse':
+          actualShapeType = 'ellipse';
+          params.stroke = '#0f766e';
+          params.strokeWidth = 2;
+          break;
+        case 'triangle':
+          actualShapeType = 'triangle';
+          break;
+        case 'line':
+          actualShapeType = 'line';
+          params.stroke = '#1e293b';
+          params.strokeWidth = 3;
+          params.fill = 'transparent';
+          break;
+      }
+      
+      // Activate shape drawing (direct approach)
+      if (canvas) {
+        setIsDrawingShape(true);
+        setShapeDrawingType(actualShapeType);
+        setShapeDrawingParams(params);
+        setCurrentDrawingShape(null);
+        setShapeStartPoint(null);
+        toast.success(`Click and drag on canvas to draw ${actualShapeType}`);
+      }
+      return;
+    }
+
+    // Handle complex shapes (immediate creation)
+    let shape;
+    const baseOptions = { left: 100, top: 100, fill: randomColor };
+    
+    switch (shapeType) {
+      case 'star':
+      case 'diamond':
+      case 'hexagon':
+      case 'arrow':
+      case 'heart':
+      case 'pentagon':
+      case 'octagon':
+      case 'cross':
+      case 'plus':
+      case 'minus':
+      case 'thinRectangle':
+      case 'pill':
+      case 'smallCircle':
+      case 'dot':
+      case 'oval':
+      case 'smallSquare':
+      case 'verticalLine':
+      case 'thickLine':
+      case 'capsule':
+      case 'tinyCircle':
+      case 'smallPill':
+      case 'button':
+      case 'badge':
+      case 'progressBar':
+      case 'divider':
+        // For complex shapes, use the old method (immediate creation)
+        let shape;
+        const baseOptions = { left: 100, top: 100, fill: randomColor };
+        switch (shapeType) {
         case 'star':
           shape = createShape('star', { ...baseOptions, outerRadius: 50, innerRadius: 25, fill: '#f59e0b', stroke: '#d97706', strokeWidth: 3 });
           break;
@@ -435,9 +793,6 @@ const LeftSidebar = () => {
           break;
         case 'heart':
           shape = createShape('heart', { ...baseOptions, fill: '#f43f5e' });
-          break;
-        case 'ellipse':
-          shape = createShape('ellipse', { ...baseOptions, rx: 80, ry: 50, stroke: '#0f766e', strokeWidth: 2 });
           break;
         case 'pentagon':
           shape = createShape('pentagon', { ...baseOptions });
